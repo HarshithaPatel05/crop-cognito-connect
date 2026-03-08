@@ -38,46 +38,14 @@ function speakWithBrowser(
   return utt;
 }
 
-// Play audio from ElevenLabs TTS edge function — falls back to browser TTS on error
-async function playElevenLabsTTS(
+// Use browser Web Speech API directly (ElevenLabs Free Tier is restricted)
+function playTTS(
   text: string,
   lang: string,
-  supabaseUrl: string,
-  publishableKey: string,
   onStart: () => void,
   onEnd: () => void,
-  onBrowserFallback: (utt: SpeechSynthesisUtterance) => void
-): Promise<HTMLAudioElement | null> {
-  onStart();
-  try {
-    const resp = await fetch(`${supabaseUrl}/functions/v1/elevenlabs-tts`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: publishableKey,
-        Authorization: `Bearer ${publishableKey}`,
-      },
-      body: JSON.stringify({ text }),
-    });
-
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      throw new Error(err.error || `TTS error ${resp.status}`);
-    }
-
-    const blob = await resp.blob();
-    const url = URL.createObjectURL(blob);
-    const audio = new Audio(url);
-    audio.onended = () => { URL.revokeObjectURL(url); onEnd(); };
-    audio.onerror = () => { URL.revokeObjectURL(url); onEnd(); };
-    await audio.play();
-    return audio;
-  } catch {
-    // Silently fall back to browser TTS
-    const utt = speakWithBrowser(text, lang, () => {}, onEnd, onEnd);
-    if (utt) onBrowserFallback(utt);
-    return null;
-  }
+): void {
+  speakWithBrowser(text, lang, onStart, onEnd, onEnd);
 }
 
 // Stream SSE response from edge function
@@ -158,11 +126,9 @@ export function AICopilot() {
   const scrollRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const { toast } = useToast();
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-  const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 
   // Greeting on open
   useEffect(() => {
@@ -237,38 +203,25 @@ export function AICopilot() {
     });
   };
 
-  const speak = async (text: string, idx: number) => {
+  const speak = (text: string, idx: number) => {
     // Stop if already speaking this message
     if (speakingIdx === idx) {
-      audioRef.current?.pause();
-      audioRef.current = null;
+      window.speechSynthesis?.cancel();
       setSpeakingIdx(null);
       setTtsLoading(false);
       return;
     }
-    // Stop any currently playing audio
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-      setSpeakingIdx(null);
-    }
+    // Stop any currently playing
+    window.speechSynthesis?.cancel();
+    setSpeakingIdx(null);
 
-    const audio = await playElevenLabsTTS(
+    setSpeakingIdx(idx);
+    playTTS(
       text,
       lang,
-      supabaseUrl,
-      publishableKey,
-      () => { setTtsLoading(true); },
-      () => { setTtsLoading(false); audioRef.current = null; setSpeakingIdx(null); },
-      () => { setTtsLoading(false); setSpeakingIdx(idx); },
+      () => { setSpeakingIdx(idx); },
+      () => { setSpeakingIdx(null); setTtsLoading(false); },
     );
-
-    if (audio) {
-      audioRef.current = audio;
-      // onStart fires before play, but we need to update speakingIdx after audio is returned
-      setSpeakingIdx(idx);
-      setTtsLoading(false);
-    }
   };
 
   const toggleVoice = () => {
@@ -363,7 +316,7 @@ export function AICopilot() {
               variant="ghost"
               size="icon"
               className="h-7 w-7 text-primary-foreground hover:bg-primary/60 flex-shrink-0"
-              onClick={() => { audioRef.current?.pause(); audioRef.current = null; setSpeakingIdx(null); setTtsLoading(false); setOpen(false); }}
+              onClick={() => { window.speechSynthesis?.cancel(); setSpeakingIdx(null); setTtsLoading(false); setOpen(false); }}
             >
               <X className="w-4 h-4" />
             </Button>
