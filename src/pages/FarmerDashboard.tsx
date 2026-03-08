@@ -1165,6 +1165,30 @@ export default function FarmerDashboard() {
                               ✅ Booking approved! Bring your produce to {b.unitName} on {b.checkInDate}.
                             </div>
                           )}
+                          {(b.status === "completed" || b.status === "active") && (
+                            <div className="space-y-2 pt-1 border-t border-border">
+                              <div className="bg-muted/40 rounded-lg px-3 py-2">
+                                <p className="text-[10px] text-muted-foreground mb-1 font-medium">Farmer Reviews for {b.unitName}</p>
+                                <RatingBadge targetId={String(b.unitId)} showReviews />
+                              </div>
+                              {b.status === "completed" && (
+                                <Button size="sm" variant="outline" className="text-xs h-8 border-primary/40 text-primary w-full"
+                                  onClick={() => {
+                                    addPending({
+                                      bookingId: b.id,
+                                      targetId: String(b.unitId),
+                                      targetType: "storage",
+                                      targetName: b.unitName,
+                                      farmerName: b.farmerName,
+                                      product: b.crop,
+                                    });
+                                    setActiveRatingPrompt(b.id);
+                                  }}>
+                                  ⭐ Rate this Storage
+                                </Button>
+                              )}
+                            </div>
+                          )}
                         </CardContent>
                       </Card>
                     );
