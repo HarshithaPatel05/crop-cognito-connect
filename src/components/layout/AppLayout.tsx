@@ -1,15 +1,66 @@
-import { Link, useLocation } from "react-router-dom";
-import { useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarTrigger, SidebarProvider,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { useRole, ROLE_META, AppRole } from "@/context/RoleContext";
 
-const NAV_ITEMS = [
+// Role-specific nav items: only show relevant pages per role
+const ROLE_NAV: Record<Exclude<AppRole, null>, { title: string; url: string; icon: string }[]> = {
+  farmer: [
+    { title: "My Dashboard", url: "/farmer", icon: "👨‍🌾" },
+    { title: "Marketplace", url: "/marketplace", icon: "🛒" },
+    { title: "Finance & Loans", url: "/finance", icon: "💰" },
+    { title: "Analytics", url: "/analytics", icon: "📊" },
+    { title: "Waste Management", url: "/waste", icon: "♻️" },
+  ],
+  buyer: [
+    { title: "Marketplace", url: "/marketplace", icon: "🛒" },
+    { title: "Analytics", url: "/analytics", icon: "📊" },
+    { title: "Finance", url: "/finance", icon: "💰" },
+  ],
+  transport: [
+    { title: "Transport Hub", url: "/transport", icon: "🚚" },
+    { title: "Analytics", url: "/analytics", icon: "📊" },
+  ],
+  storage: [
+    { title: "Storage Dashboard", url: "/storage", icon: "🏪" },
+    { title: "Waste Management", url: "/waste", icon: "♻️" },
+    { title: "Analytics", url: "/analytics", icon: "📊" },
+  ],
+  finance: [
+    { title: "Finance & Loans", url: "/finance", icon: "💰" },
+    { title: "Analytics", url: "/analytics", icon: "📊" },
+    { title: "Admin Panel", url: "/admin", icon: "⚙️" },
+  ],
+  fpo: [
+    { title: "FPO / AO Portal", url: "/fpo", icon: "🏛️" },
+    { title: "Analytics", url: "/analytics", icon: "📊" },
+    { title: "Farmer Dashboards", url: "/farmer", icon: "👨‍🌾" },
+  ],
+  analytics: [
+    { title: "Analytics Dashboard", url: "/analytics", icon: "📊" },
+    { title: "Marketplace Trends", url: "/marketplace", icon: "🛒" },
+    { title: "FPO Portal", url: "/fpo", icon: "🏛️" },
+  ],
+  admin: [
+    { title: "Admin Panel", url: "/admin", icon: "⚙️" },
+    { title: "Farmer Dashboard", url: "/farmer", icon: "👨‍🌾" },
+    { title: "Marketplace", url: "/marketplace", icon: "🛒" },
+    { title: "Transport", url: "/transport", icon: "🚚" },
+    { title: "Storage", url: "/storage", icon: "🏪" },
+    { title: "Finance & Loans", url: "/finance", icon: "💰" },
+    { title: "Analytics", url: "/analytics", icon: "📊" },
+    { title: "FPO / Agri Officer", url: "/fpo", icon: "🏛️" },
+    { title: "Waste Management", url: "/waste", icon: "♻️" },
+  ],
+};
+
+// Fallback nav if not logged in
+const ALL_NAV = [
   { title: "Farmer Dashboard", url: "/farmer", icon: "👨‍🌾" },
   { title: "Buyer Marketplace", url: "/marketplace", icon: "🛒" },
   { title: "Transport", url: "/transport", icon: "🚚" },
@@ -23,11 +74,17 @@ const NAV_ITEMS = [
 
 function AppSidebarInner() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { state } = useSidebar();
+  const { user, logout } = useRole();
   const collapsed = state === "collapsed";
+
+  const navItems = user ? (ROLE_NAV[user.role!] ?? ALL_NAV) : ALL_NAV;
+  const roleMeta = user?.role ? ROLE_META[user.role] : null;
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
+      {/* Logo */}
       <div className="flex items-center gap-2 px-4 py-4 border-b border-sidebar-border">
         <span className="text-2xl">🌾</span>
         {!collapsed && (
@@ -37,12 +94,30 @@ function AppSidebarInner() {
           </div>
         )}
       </div>
+
+      {/* Role badge */}
+      {user && !collapsed && (
+        <div className="px-4 py-2 border-b border-sidebar-border">
+          <div className="flex items-center gap-2 bg-sidebar-accent/60 rounded-lg px-2.5 py-1.5">
+            <span className="text-base">{roleMeta?.icon}</span>
+            <div>
+              <div className="text-sidebar-foreground text-xs font-semibold">{roleMeta?.label}</div>
+              <div className="text-sidebar-foreground/60 text-[10px]">Active Role</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <SidebarContent>
         <SidebarGroup>
-          {!collapsed && <SidebarGroupLabel className="text-sidebar-foreground/60 uppercase text-xs tracking-wider">Platform</SidebarGroupLabel>}
+          {!collapsed && (
+            <SidebarGroupLabel className="text-sidebar-foreground/60 uppercase text-xs tracking-wider">
+              {user ? "My Features" : "Platform"}
+            </SidebarGroupLabel>
+          )}
           <SidebarGroupContent>
             <SidebarMenu>
-              {NAV_ITEMS.map((item) => {
+              {navItems.map((item) => {
                 const active = location.pathname === item.url;
                 return (
                   <SidebarMenuItem key={item.title}>
@@ -66,15 +141,39 @@ function AppSidebarInner() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+
+      {/* User profile + logout */}
       {!collapsed && (
-        <div className="p-4 border-t border-sidebar-border">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-sidebar-accent flex items-center justify-center text-xs font-bold text-sidebar-accent-foreground">RK</div>
-            <div>
-              <div className="text-sidebar-foreground text-xs font-medium">Ramesh Kumar</div>
-              <div className="text-sidebar-foreground/60 text-xs">Farmer · Warangal</div>
-            </div>
-          </div>
+        <div className="p-3 border-t border-sidebar-border space-y-2">
+          {user ? (
+            <>
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-full bg-sidebar-accent flex items-center justify-center text-xs font-bold text-sidebar-accent-foreground flex-shrink-0">
+                  {user.name.slice(0, 2).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sidebar-foreground text-xs font-medium truncate">{user.name}</div>
+                  <div className="text-sidebar-foreground/60 text-[10px] truncate">{user.location}</div>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full text-xs h-7 border-sidebar-border text-sidebar-foreground/70 hover:text-sidebar-foreground"
+                onClick={() => { logout(); navigate("/login"); }}
+              >
+                🚪 Logout
+              </Button>
+            </>
+          ) : (
+            <Button
+              size="sm"
+              className="w-full text-xs h-7 bg-primary"
+              onClick={() => navigate("/login")}
+            >
+              🔐 Login
+            </Button>
+          )}
         </div>
       )}
     </Sidebar>
@@ -84,7 +183,9 @@ function AppSidebarInner() {
 interface AppLayoutProps { children: React.ReactNode; title: string; subtitle?: string; }
 
 export function AppLayout({ children, title, subtitle }: AppLayoutProps) {
+  const { user, logout } = useRole();
   const navigate = useNavigate();
+  const roleMeta = user?.role ? ROLE_META[user.role] : null;
 
   return (
     <SidebarProvider>
@@ -94,30 +195,36 @@ export function AppLayout({ children, title, subtitle }: AppLayoutProps) {
           {/* Top bar */}
           <header className="h-14 flex items-center gap-3 border-b border-border bg-card px-4 sticky top-0 z-20">
             <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
-            <div className="flex-1">
-              <div className="font-semibold text-foreground text-sm">{title}</div>
-              {subtitle && <div className="text-xs text-muted-foreground">{subtitle}</div>}
+            <div className="flex-1 min-w-0">
+              <div className="font-semibold text-foreground text-sm truncate">{title}</div>
+              {subtitle && <div className="text-xs text-muted-foreground truncate hidden sm:block">{subtitle}</div>}
             </div>
             <div className="flex items-center gap-2">
-              <Select defaultValue="farmer" onValueChange={(v) => {
-                const map: Record<string, string> = { farmer: "/farmer", buyer: "/marketplace", transport: "/transport", fpo: "/fpo", admin: "/admin" };
-                if (map[v]) navigate(map[v]);
-              }}>
-                <SelectTrigger className="h-8 text-xs w-40 border-border">
-                  <SelectValue placeholder="Switch Role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="farmer">👨‍🌾 Farmer</SelectItem>
-                  <SelectItem value="buyer">🛒 Buyer</SelectItem>
-                  <SelectItem value="transport">🚚 Transport</SelectItem>
-                  <SelectItem value="fpo">🏛️ FPO / AO</SelectItem>
-                  <SelectItem value="admin">⚙️ Admin</SelectItem>
-                </SelectContent>
-              </Select>
-              <Badge variant="outline" className="text-xs bg-agro-green-light text-primary border-primary/30 hidden sm:flex">
+              {/* Role chip */}
+              {user && roleMeta && (
+                <div className="hidden sm:flex items-center gap-1.5 bg-primary/8 border border-primary/20 rounded-full px-3 py-1">
+                  <span className="text-sm">{roleMeta.icon}</span>
+                  <span className="text-xs font-medium text-primary">{roleMeta.label}</span>
+                </div>
+              )}
+              <Badge variant="outline" className="text-xs bg-agro-green-light text-primary border-primary/30 hidden md:flex">
                 <span className="pulse-live w-1.5 h-1.5 rounded-full bg-primary mr-1.5"></span>
                 Live
               </Badge>
+              {user ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs h-8 border-border"
+                  onClick={() => { logout(); navigate("/login"); }}
+                >
+                  🚪 Logout
+                </Button>
+              ) : (
+                <Button size="sm" className="bg-primary text-xs h-8" onClick={() => navigate("/login")}>
+                  🔐 Login
+                </Button>
+              )}
             </div>
           </header>
           <main className="flex-1 overflow-auto p-4 md:p-6">
