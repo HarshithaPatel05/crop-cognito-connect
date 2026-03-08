@@ -462,8 +462,9 @@ export default function FarmerDashboard() {
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="bg-muted flex-wrap h-auto gap-1">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="findtransport">🔍 Find Transport</TabsTrigger>
                 <TabsTrigger value="transport" className="relative">
-                  🚚 Transport
+                  🚚 My Bookings
                   {pendingCounter > 0 && (
                     <span className="absolute -top-1 -right-1 bg-accent text-foreground text-[9px] font-bold rounded-full px-1 leading-4 min-w-[16px] text-center">
                       {pendingCounter}
