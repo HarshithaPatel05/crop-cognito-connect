@@ -180,6 +180,7 @@ export function AICopilot() {
     setLoading(true);
 
     let assistantText = "";
+    let finalIdx = -1;
     await streamCopilot({
       messages: [...messages, userMsg],
       language: lang,
@@ -189,14 +190,22 @@ export function AICopilot() {
         setMessages((prev) => {
           const last = prev[prev.length - 1];
           if (last?.role === "assistant") {
+            finalIdx = prev.length - 1;
             return prev.map((m, i) =>
               i === prev.length - 1 ? { ...m, content: assistantText } : m
             );
           }
+          finalIdx = prev.length;
           return [...prev, { role: "assistant", content: assistantText }];
         });
       },
-      onDone: () => setLoading(false),
+      onDone: () => {
+        setLoading(false);
+        if (autoRead && assistantText) {
+          // slight delay so state settles
+          setTimeout(() => speak(assistantText, finalIdx), 100);
+        }
+      },
       onError: (err) => {
         setLoading(false);
         toast({ variant: "destructive", title: "AI Error", description: err });
