@@ -161,6 +161,29 @@ export function AICopilot() {
     });
   };
 
+  const speak = (text: string, idx: number) => {
+    if (!window.speechSynthesis) {
+      toast({ title: "Not supported", description: "Text-to-speech not supported on this browser." });
+      return;
+    }
+    // If already speaking this message, stop it
+    if (speakingIdx === idx) {
+      window.speechSynthesis.cancel();
+      setSpeakingIdx(null);
+      return;
+    }
+    window.speechSynthesis.cancel();
+    // Strip markdown-like symbols for cleaner speech
+    const clean = text.replace(/[*_`#~>]/g, "").replace(/\n+/g, " ");
+    const utterance = new SpeechSynthesisUtterance(clean);
+    utterance.lang = lang === "te" ? "te-IN" : lang === "hi" ? "hi-IN" : "en-IN";
+    utterance.rate = 0.92;
+    utterance.onstart = () => setSpeakingIdx(idx);
+    utterance.onend = () => setSpeakingIdx(null);
+    utterance.onerror = () => setSpeakingIdx(null);
+    window.speechSynthesis.speak(utterance);
+  };
+
   const toggleVoice = () => {
     type SpeechRecognitionCtor = new () => SpeechRecognitionEvent & {
       lang: string; interimResults: boolean;
