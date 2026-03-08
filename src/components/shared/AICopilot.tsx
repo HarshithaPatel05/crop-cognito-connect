@@ -259,12 +259,8 @@ export function AICopilot() {
       supabaseUrl,
       publishableKey,
       () => { setTtsLoading(true); },
-      () => { setSpeakingIdx(idx); setTtsLoading(false); audioRef.current = null; setSpeakingIdx(null); },
-      (err) => {
-        setTtsLoading(false);
-        setSpeakingIdx(null);
-        toast({ variant: "destructive", title: "Read aloud failed", description: err });
-      },
+      () => { setTtsLoading(false); audioRef.current = null; setSpeakingIdx(null); },
+      () => { setTtsLoading(false); setSpeakingIdx(idx); },
     );
 
     if (audio) {
