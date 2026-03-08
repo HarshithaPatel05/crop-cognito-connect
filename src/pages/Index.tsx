@@ -60,7 +60,7 @@ export default function Index() {
               Live Platform
             </Badge>
             <Button size="sm" asChild className="bg-primary hover:bg-primary/90">
-              <Link to="/farmer">Get Started</Link>
+              <Link to="/login">Get Started</Link>
             </Button>
           </div>
         </div>
