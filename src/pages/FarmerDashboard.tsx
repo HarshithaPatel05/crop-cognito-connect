@@ -80,6 +80,119 @@ const EMPTY_STORAGE: StorageForm = {
   checkInDate: "", checkOutDate: "", notes: "", phone: "",
 };
 
+// ── Helper: get the confirmed pickup time for a booking in a conflict ─────────
+function b_pickupFor(
+  conflict: import("@/context/TransportBookingContext").PickupConflict,
+  myBookings: import("@/context/TransportBookingContext").TransportBooking[]
+): string | undefined {
+  const match = myBookings.find(b => conflict.bookingIds.includes(b.id));
+  return match?.confirmedPickupTime ?? match?.time;
+}
+
+// ── Simulated tracker waypoints (GPS-style) ───────────────────────────────────
+const TRACKER_STAGES = [
+  { key: "depot",     label: "Vehicle at Depot",         icon: "🏠", desc: "Vehicle is being prepared at the origin depot." },
+  { key: "enroute",   label: "En Route to Pickup",        icon: "🛣️", desc: "Driver is heading to your pickup location." },
+  { key: "arrived",   label: "Arrived at Pickup",         icon: "📍", desc: "Vehicle has arrived. Please be ready to load." },
+  { key: "loading",   label: "Loading in Progress",       icon: "📦", desc: "Your produce is being loaded onto the vehicle." },
+  { key: "transit",   label: "In Transit to Market",      icon: "🚚", desc: "Vehicle is on its way to the destination market." },
+  { key: "delivered", label: "Delivered at Destination",  icon: "✅", desc: "Produce delivered successfully." },
+];
+
+function VehicleTracker({
+  booking,
+  vehicle,
+}: {
+  booking: import("@/context/TransportBookingContext").TransportBooking;
+  vehicle: import("@/context/TransportBookingContext").AvailableVehicle;
+}) {
+  // Simulate a realistic stage based on pickup date/time vs now
+  const [stage, setStage] = useState<number>(1); // default: en-route
+
+  // Cycle through stages for demo purposes
+  const handleAdvance = () => setStage(s => Math.min(s + 1, TRACKER_STAGES.length - 1));
+  const handleReset = () => setStage(0);
+
+  const current = TRACKER_STAGES[stage];
+  const isDelivered = stage === TRACKER_STAGES.length - 1;
+
+  return (
+    <div className="bg-muted/30 border border-border rounded-xl p-4 space-y-3 mt-1">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-base">📡</span>
+          <span className="text-xs font-semibold text-foreground">Live Vehicle Tracker</span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${
+            isDelivered ? "bg-primary/10 text-primary border-primary/30" : "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30"
+          }`}>
+            {isDelivered ? "✅ Delivered" : "🟢 Live"}
+          </span>
+        </div>
+        <span className="text-[10px] text-muted-foreground">{vehicle.vehicleNo} · {vehicle.ownerName}</span>
+      </div>
+
+      {/* Stage progress bar */}
+      <div className="flex items-center gap-0.5">
+        {TRACKER_STAGES.map((s, i) => (
+          <div key={s.key} className="flex-1 flex flex-col items-center gap-1">
+            <div className={`h-1.5 w-full rounded-full transition-all duration-300 ${
+              i < stage ? "bg-primary" : i === stage ? "bg-primary/60 animate-pulse" : "bg-muted"
+            }`} />
+            <span className={`text-[9px] hidden sm:block text-center ${i === stage ? "text-primary font-semibold" : "text-muted-foreground"}`}>
+              {s.icon}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Current status */}
+      <div className="flex items-start gap-3 bg-background border border-border rounded-lg p-3">
+        <span className="text-2xl">{current.icon}</span>
+        <div className="flex-1">
+          <div className="text-sm font-semibold text-foreground">{current.label}</div>
+          <div className="text-xs text-muted-foreground">{current.desc}</div>
+          <div className="text-[10px] text-muted-foreground mt-1">
+            📍 {booking.pickupLocation} → 🏪 {booking.dropLocation} · 📞 {vehicle.phone}
+          </div>
+        </div>
+      </div>
+
+      {/* Milestone list */}
+      <div className="space-y-1">
+        {TRACKER_STAGES.map((s, i) => (
+          <div key={s.key} className={`flex items-center gap-2 text-xs transition-opacity ${i > stage ? "opacity-30" : ""}`}>
+            <span className={`w-4 h-4 flex items-center justify-center rounded-full text-[10px] flex-shrink-0 ${
+              i < stage ? "bg-primary text-primary-foreground" :
+              i === stage ? "bg-primary/20 text-primary border border-primary/40" :
+              "bg-muted text-muted-foreground"
+            }`}>
+              {i < stage ? "✓" : i + 1}
+            </span>
+            <span className={i === stage ? "font-semibold text-foreground" : "text-muted-foreground"}>{s.label}</span>
+            {i < stage && <span className="text-[10px] text-primary ml-auto">Done</span>}
+            {i === stage && <span className="text-[10px] text-primary ml-auto animate-pulse">● Now</span>}
+          </div>
+        ))}
+      </div>
+
+      {/* Demo controls */}
+      <div className="flex gap-2 pt-1 border-t border-border">
+        <Button size="sm" variant="outline" className="text-[10px] h-6 px-2 flex-1" onClick={handleReset} disabled={stage === 0}>
+          ↩ Reset
+        </Button>
+        <Button size="sm" className="text-[10px] h-6 px-2 flex-1 bg-primary" onClick={handleAdvance} disabled={isDelivered}>
+          Next Stage →
+        </Button>
+      </div>
+      <p className="text-[10px] text-muted-foreground text-center">
+        Demo: advance stages to simulate vehicle movement. In production, this updates via GPS.
+      </p>
+    </div>
+  );
+}
+
+
 // ── VehicleCard: used in Find Transport tab ───────────────────────────────────
 function VehicleCard({
   v,
