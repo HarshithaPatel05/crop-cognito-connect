@@ -77,6 +77,67 @@ function fmtDuration(mins: number) {
   return `${h}h ${m}min`;
 }
 
+// ── Route Demand Analytics Data ──────────────────────────────────────────────
+const ROUTE_DEMAND_DATA = [
+  { route: "Warangal → Hyderabad",   bookings: 38, weightTon: 94,  revenue: 82000,  avgPrice: 2158, growthPct: 18,  topCrop: "Tomato",  distKm: 145, demandScore: 94 },
+  { route: "Karimnagar → Hyderabad", bookings: 31, weightTon: 72,  revenue: 64000,  avgPrice: 2064, growthPct: 12,  topCrop: "Onion",   distKm: 165, demandScore: 87 },
+  { route: "Nizamabad → Hyderabad",  bookings: 27, weightTon: 61,  revenue: 58000,  avgPrice: 2148, growthPct: 8,   topCrop: "Chilli",  distKm: 180, demandScore: 79 },
+  { route: "Adilabad → Nagpur",      bookings: 19, weightTon: 48,  revenue: 49000,  avgPrice: 2578, growthPct: 22,  topCrop: "Soybean", distKm: 290, demandScore: 68 },
+  { route: "Warangal → Chennai",     bookings: 14, weightTon: 35,  revenue: 58000,  avgPrice: 4142, growthPct: 31,  topCrop: "Turmeric",distKm: 620, demandScore: 61 },
+  { route: "Khammam → Hyderabad",    bookings: 12, weightTon: 28,  revenue: 26000,  avgPrice: 2166, growthPct: 5,   topCrop: "Rice",    distKm: 195, demandScore: 55 },
+  { route: "Adilabad → Hyderabad",   bookings: 10, weightTon: 22,  revenue: 24000,  avgPrice: 2400, growthPct: -3,  topCrop: "Wheat",   distKm: 240, demandScore: 48 },
+  { route: "Warangal → Pune",        bookings: 8,  weightTon: 20,  revenue: 33000,  avgPrice: 4125, growthPct: 14,  topCrop: "Turmeric",distKm: 680, demandScore: 42 },
+];
+
+// Origin & destination demand
+const ORIGIN_DEMAND = [
+  { city: "Warangal",    bookings: 60, weightTon: 149 },
+  { city: "Karimnagar",  bookings: 43, weightTon: 98  },
+  { city: "Nizamabad",   bookings: 35, weightTon: 80  },
+  { city: "Adilabad",    bookings: 29, weightTon: 70  },
+  { city: "Khammam",     bookings: 12, weightTon: 28  },
+];
+const DEST_DEMAND = [
+  { city: "Hyderabad",   bookings: 118, weightTon: 277 },
+  { city: "Nagpur",      bookings: 19,  weightTon: 48  },
+  { city: "Chennai",     bookings: 14,  weightTon: 35  },
+  { city: "Pune",        bookings: 8,   weightTon: 20  },
+];
+
+// Weekly demand pattern (Mon–Sun index)
+const WEEKLY_DEMAND = [
+  { day: "Mon", bookings: 12, avgLoad: 68 },
+  { day: "Tue", bookings: 18, avgLoad: 74 },
+  { day: "Wed", bookings: 22, avgLoad: 81 },
+  { day: "Thu", bookings: 19, avgLoad: 77 },
+  { day: "Fri", bookings: 28, avgLoad: 91 },
+  { day: "Sat", bookings: 34, avgLoad: 96 },
+  { day: "Sun", bookings: 14, avgLoad: 58 },
+];
+
+// Month-over-month bookings
+const MONTHLY_TREND = [
+  { month: "May",  bookings: 48, revenue: 88000  },
+  { month: "Jun",  bookings: 54, revenue: 102000 },
+  { month: "Jul",  bookings: 61, revenue: 116000 },
+  { month: "Aug",  bookings: 58, revenue: 112000 },
+  { month: "Sep",  bookings: 72, revenue: 138000 },
+  { month: "Oct",  bookings: 90, revenue: 172000 },
+];
+
+// Crop demand radar per top route
+const CROP_ROUTE_DEMAND = [
+  { route: "Wgl→Hyd",  Tomato: 38, Onion: 18, Chilli: 12, Turmeric: 8, Rice: 14 },
+  { route: "Kmnr→Hyd", Tomato: 14, Onion: 42, Chilli: 10, Turmeric: 5, Rice: 9  },
+  { route: "Nzbd→Hyd", Tomato: 8,  Onion: 16, Chilli: 41, Turmeric: 6, Rice: 10 },
+  { route: "Adl→Ngp",  Tomato: 4,  Onion: 6,  Chilli: 5,  Turmeric: 10, Rice: 5 },
+  { route: "Wgl→Chn",  Tomato: 6,  Onion: 4,  Chilli: 9,  Turmeric: 28, Rice: 3 },
+];
+
+const DEMAND_COLORS = [
+  "hsl(var(--primary))", "#f97316", "#eab308", "#06b6d4", "#8b5cf6", "#ef4444", "#84cc16", "#ec4899"
+];
+
 // ── Static demo data ──────────────────────────────────────────────────────────
 const ACTIVE_TRIPS = [
   { id: "TR-001", farmer: "Prakash Rao", from: "Nizamabad", to: "Chennai", crop: "Chilli", weight: "800kg", weightKg: 800, agreedPrice: 1400, status: "in-transit", progress: 65, eta: "4 hrs remaining", startTime: "06:00 AM", driver: "Vijay Kumar" },
