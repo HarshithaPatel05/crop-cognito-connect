@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SpoilageRiskMeter } from "@/components/shared/SpoilageRiskMeter";
 import { StatCard } from "@/components/shared/StatCard";
 import { VoiceAssistant } from "@/components/shared/VoiceAssistant";
+import { RatingBadge } from "@/components/shared/RatingBadge";
 import { STORAGE_UNITS } from "@/data/mockData";
 import { useToast } from "@/hooks/use-toast";
 import { useStorageBooking } from "@/context/StorageBookingContext";
