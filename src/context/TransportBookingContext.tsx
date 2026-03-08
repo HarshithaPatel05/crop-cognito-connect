@@ -288,6 +288,8 @@ const SEED: TransportBooking[] = [
 export function TransportBookingProvider({ children }: { children: React.ReactNode }) {
   const [bookings, setBookings] = useState<TransportBooking[]>(SEED);
 
+  const pickupConflicts = computeConflicts(bookings);
+
   const addBooking = (b: Omit<TransportBooking, "id" | "status" | "createdAt">) => {
     const newBooking: TransportBooking = {
       ...b,
@@ -345,9 +347,16 @@ export function TransportBookingProvider({ children }: { children: React.ReactNo
     );
   };
 
+  // Transport owner sets the confirmed pickup time (may be shared across bookings)
+  const setConfirmedPickupTime = (id: string, time: string) => {
+    setBookings((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, confirmedPickupTime: time } : b))
+    );
+  };
+
   return (
     <TransportBookingContext.Provider
-      value={{ bookings, addBooking, addBroadcastBookings, sendCounter, acceptBooking, rejectBooking, farmerAccept, farmerReject }}
+      value={{ bookings, pickupConflicts, addBooking, addBroadcastBookings, sendCounter, acceptBooking, rejectBooking, farmerAccept, farmerReject, setConfirmedPickupTime }}
     >
       {children}
     </TransportBookingContext.Provider>
