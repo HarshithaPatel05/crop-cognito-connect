@@ -345,14 +345,19 @@ export function AICopilot() {
                   {msg.role === "assistant" && (
                     <button
                       onClick={() => speak(msg.content, i)}
-                      title={speakingIdx === i ? "Stop reading" : "Read aloud"}
-                      className={`mt-1.5 flex items-center gap-1 text-[10px] transition-colors ${
+                      disabled={ttsLoading && speakingIdx !== i}
+                      title={speakingIdx === i ? "Stop reading" : "Read aloud (ElevenLabs AI voice)"}
+                      className={`mt-1.5 flex items-center gap-1 text-[10px] transition-colors disabled:opacity-40 ${
                         speakingIdx === i
                           ? "text-primary font-medium"
+                          : ttsLoading && speakingIdx === null
+                          ? "text-muted-foreground"
                           : "text-muted-foreground hover:text-primary"
                       }`}
                     >
-                      {speakingIdx === i
+                      {ttsLoading && speakingIdx === null && i === messages.length - 1
+                        ? <><Loader2 className="w-3 h-3 animate-spin" /> Loading voice…</>
+                        : speakingIdx === i
                         ? <><VolumeX className="w-3 h-3" /> Stop</>
                         : <><Volume2 className="w-3 h-3" /> Read aloud</>
                       }
