@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,16 +8,17 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AIRecommendationBox } from "@/components/shared/AIRecommendationBox";
 import { WeatherWidget } from "@/components/shared/WeatherWidget";
 import { HarvestReadinessScore } from "@/components/shared/HarvestReadinessScore";
 import { SpoilageRiskMeter } from "@/components/shared/SpoilageRiskMeter";
 import { StatCard } from "@/components/shared/StatCard";
 import { VoiceAssistant } from "@/components/shared/VoiceAssistant";
+import { StarRating } from "@/components/shared/StarRating";
 import { AI_RECOMMENDATIONS, STORAGE_UNITS } from "@/data/mockData";
 import { useToast } from "@/hooks/use-toast";
-import { useTransportBooking } from "@/context/TransportBookingContext";
+import { useTransportBooking, AVAILABLE_VEHICLES, AvailableVehicle } from "@/context/TransportBookingContext";
 import { useStorageBooking, StorageType } from "@/context/StorageBookingContext";
 import { useRole, FarmerProfile } from "@/context/RoleContext";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
@@ -29,7 +30,7 @@ const PRICE_HISTORY = [
 
 const QUICK_ACTIONS = [
   { icon: "📋", label: "List Crop for Sale" },
-  { icon: "🚚", label: "Request Transport" },
+  { icon: "🚚", label: "Find Transport" },
   { icon: "💰", label: "Apply for Loan" },
   { icon: "📸", label: "Upload Crop Image" },
   { icon: "🏪", label: "Book Storage" },
@@ -39,10 +40,10 @@ const QUICK_ACTIONS = [
 const STATUS_META: Record<string, { label: string; color: string }> = {
   pending:          { label: "⏳ Pending",          color: "bg-muted text-muted-foreground" },
   "counter-sent":   { label: "💬 Counter Received", color: "bg-accent/20 text-foreground border-accent/40" },
-  accepted:         { label: "✅ Accepted",          color: "bg-primary/10 text-primary border-primary/30" },
+  accepted:         { label: "✅ Owner Accepted",    color: "bg-primary/10 text-primary border-primary/30" },
   rejected:         { label: "❌ Rejected",          color: "bg-destructive/10 text-destructive border-destructive/30" },
-  "farmer-accepted":{ label: "🎉 Trip Confirmed",   color: "bg-primary/10 text-primary border-primary/30" },
-  "farmer-rejected":{ label: "✗ You Declined",      color: "bg-destructive/10 text-destructive border-destructive/30" },
+  "farmer-accepted":{ label: "🎉 CONFIRMED",         color: "bg-primary/10 text-primary border-primary/30" },
+  "farmer-rejected":{ label: "✗ You Declined",       color: "bg-destructive/10 text-destructive border-destructive/30" },
 };
 
 const STORAGE_STATUS_META: Record<string, { label: string; color: string }> = {
@@ -78,6 +79,118 @@ const EMPTY_STORAGE: StorageForm = {
   unitId: "", crop: "", customCrop: "", weightKg: "",
   checkInDate: "", checkOutDate: "", notes: "", phone: "",
 };
+
+// ── VehicleCard: used in Find Transport tab ───────────────────────────────────
+function VehicleCard({
+  v,
+  onBook,
+  onBroadcast,
+  selected,
+  onToggleSelect,
+}: {
+  v: AvailableVehicle;
+  onBook: (v: AvailableVehicle) => void;
+  onBroadcast: (v: AvailableVehicle) => void;
+  selected: boolean;
+  onToggleSelect: (id: string) => void;
+}) {
+  const freeTon = v.capacityTon - v.currentLoadTon;
+  const usedPct = Math.round((v.currentLoadTon / v.capacityTon) * 100);
+  const loadColor = usedPct >= 80 ? "bg-destructive" : usedPct >= 50 ? "bg-yellow-500" : "bg-primary";
+  const loadTextColor = usedPct >= 80 ? "text-destructive" : usedPct >= 50 ? "text-yellow-600" : "text-primary";
+
+  return (
+    <Card className={`border-2 transition-all duration-200 cursor-pointer ${selected ? "border-primary bg-primary/5 shadow-md" : "border-border hover:border-primary/40"}`}>
+      <CardContent className="p-4 space-y-3">
+        {/* Header row */}
+        <div className="flex items-start justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <div
+              className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${selected ? "bg-primary border-primary" : "border-muted-foreground/40"}`}
+              onClick={() => onToggleSelect(v.id)}
+            >
+              {selected && <span className="text-primary-foreground text-xs font-bold">✓</span>}
+            </div>
+            <div>
+              <div className="font-semibold text-sm text-foreground">{v.ownerName}</div>
+              <div className="text-[10px] text-muted-foreground">{v.vehicleNo} · {v.location}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {v.isRefrigerated && (
+              <Badge className="text-[10px] bg-blue-500/10 text-blue-600 border border-blue-400/30">❄️ Refrigerated</Badge>
+            )}
+            <Badge variant="outline" className="text-[10px]">{v.vehicleType}</Badge>
+          </div>
+        </div>
+
+        {/* Capacity bar */}
+        <div className="space-y-1">
+          <div className="flex justify-between text-[10px] text-muted-foreground">
+            <span>Current Load</span>
+            <span className={`font-semibold ${loadTextColor}`}>{usedPct}% full · {freeTon.toFixed(1)}T free</span>
+          </div>
+          <div className="h-2 bg-muted rounded-full overflow-hidden">
+            <div className={`h-2 rounded-full ${loadColor}`} style={{ width: `${usedPct}%` }} />
+          </div>
+          <div className="text-[10px] text-muted-foreground">{v.currentLoadTon}T booked / {v.capacityTon}T total capacity</div>
+        </div>
+
+        {/* Stats grid */}
+        <div className="grid grid-cols-3 gap-2 text-xs">
+          <div className="bg-muted/50 rounded-lg p-2 text-center">
+            <div className="font-bold text-foreground">₹{v.pricePerKm}/km</div>
+            <div className="text-[10px] text-muted-foreground">Per KM</div>
+          </div>
+          <div className="bg-muted/50 rounded-lg p-2 text-center">
+            <div className="font-bold text-foreground">₹{v.pricePerTon}/T</div>
+            <div className="text-[10px] text-muted-foreground">Per Ton</div>
+          </div>
+          <div className="bg-muted/50 rounded-lg p-2 text-center">
+            <div className="font-bold text-foreground">{v.onTimeRate}%</div>
+            <div className="text-[10px] text-muted-foreground">On-Time</div>
+          </div>
+        </div>
+
+        {/* Rating + trips */}
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <StarRating rating={v.rating} size="sm" showValue />
+            <span className="text-[10px] text-muted-foreground">{v.totalTrips} trips</span>
+          </div>
+          <div className="text-[10px] text-muted-foreground">⛽ {v.fuelType}</div>
+        </div>
+
+        {/* Routes */}
+        <div className="flex flex-wrap gap-1">
+          {v.routes.map(r => (
+            <span key={r} className="text-[10px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground">{r}</span>
+          ))}
+        </div>
+
+        {/* Features */}
+        <div className="flex flex-wrap gap-1">
+          {v.features.map(f => (
+            <span key={f} className="text-[10px] bg-primary/5 px-1.5 py-0.5 rounded-full text-primary border border-primary/20">{f}</span>
+          ))}
+        </div>
+
+        {/* Availability */}
+        <div className="text-[10px] text-muted-foreground">🕐 Available: {v.availableFrom} – {v.availableTo} · Min load: {v.minLoadKg}kg</div>
+
+        {/* Action buttons */}
+        <div className="flex gap-2 pt-1">
+          <Button size="sm" className="flex-1 bg-primary text-xs h-8" onClick={() => onBook(v)}>
+            📝 Request This Vehicle
+          </Button>
+          <Button size="sm" variant="outline" className="text-xs h-8 border-border" onClick={() => onBroadcast(v)}>
+            📡 Broadcast
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function FarmerDashboard() {
   const { toast } = useToast();
