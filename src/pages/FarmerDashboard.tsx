@@ -195,7 +195,7 @@ function VehicleCard({
 export default function FarmerDashboard() {
   const { toast } = useToast();
   const { user } = useRole();
-  const { bookings, addBooking, addBroadcastBookings, farmerAccept, farmerReject } = useTransportBooking();
+  const { bookings, pickupConflicts, addBooking, addBroadcastBookings, farmerAccept, farmerReject } = useTransportBooking();
   const { bookings: storageBookings, addBooking: addStorageBooking } = useStorageBooking();
 
   const fp = (user?.profile ?? {}) as FarmerProfile;
