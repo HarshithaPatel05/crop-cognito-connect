@@ -203,6 +203,7 @@ export const AVAILABLE_VEHICLES: AvailableVehicle[] = [
 
 interface TransportBookingContextValue {
   bookings: TransportBooking[];
+  pickupConflicts: PickupConflict[];
   addBooking: (b: Omit<TransportBooking, "id" | "status" | "createdAt">) => void;
   addBroadcastBookings: (
     base: Omit<TransportBooking, "id" | "status" | "createdAt" | "targetVehicleId">,
@@ -213,6 +214,37 @@ interface TransportBookingContextValue {
   rejectBooking: (id: string) => void;
   farmerAccept: (id: string) => void;
   farmerReject: (id: string) => void;
+  setConfirmedPickupTime: (id: string, time: string) => void;
+}
+
+// ── Helper: detect same-vehicle same-date same-time conflicts ─────────────────
+function computeConflicts(bookings: TransportBooking[]): PickupConflict[] {
+  // Only consider confirmed (farmer-accepted) bookings that have a vehicle
+  const confirmed = bookings.filter(
+    b => (b.status === "farmer-accepted" || b.status === "accepted") && b.targetVehicleId
+  );
+
+  // Group by vehicleId|date|time
+  const groups: Record<string, TransportBooking[]> = {};
+  for (const b of confirmed) {
+    const pickupTime = b.confirmedPickupTime ?? b.time;
+    const key = `${b.targetVehicleId}|${b.date}|${pickupTime}`;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(b);
+  }
+
+  return Object.entries(groups)
+    .filter(([, bks]) => bks.length >= 2)
+    .map(([key, bks]) => {
+      const [vehicleId, date, time] = key.split("|");
+      return {
+        vehicleId,
+        date,
+        time,
+        bookingIds: bks.map(b => b.id),
+        farmerNames: bks.map(b => b.farmerName),
+      };
+    });
 }
 
 const TransportBookingContext = createContext<TransportBookingContextValue | null>(null);
