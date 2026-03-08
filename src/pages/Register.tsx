@@ -483,9 +483,35 @@ export default function Register() {
     if (!selectedRole) { setRoleError("Please select a role."); setStep(1); return; }
     setSubmitting(true);
     const roleData = ROLES.find(r => r.id === selectedRole)!;
+
+    // Build role-specific profile object
+    const profile = (() => {
+      switch (selectedRole) {
+        case "farmer":     return { farmArea: data.farmArea, soilType: data.soilType, irrigationType: data.irrigationType, primaryCrop: data.primaryCrop, secondaryCrop: data.secondaryCrop, harvestSeason: data.harvestSeason, annualYield: data.annualYield, farmingType: data.farmingType, landOwnership: data.landOwnership, hasKCC: data.hasKCC, bankName: data.bankName, preferredMarket: data.preferredMarket };
+        case "buyer":      return { buyerType: data.buyerType, orgName: data.orgName, gstNo: data.gstNo, monthlyVolume: data.monthlyVolume, preferredCrops: data.preferredCrops, deliveryArea: data.deliveryArea, paymentMode: data.paymentMode };
+        case "transport":  return { vehicleType: data.vehicleType, vehicleNo: data.vehicleNo, capacity: data.capacity, isRefrigerated: data.isRefrigerated, driverLicenseNo: data.driverLicenseNo, operatingRoutes: data.operatingRoutes, tripsPerMonth: data.tripsPerMonth, fuelType: data.fuelType };
+        case "storage":    return { warehouseName: data.warehouseName, storageCapacity: data.storageCapacity, storageTypes: data.storageTypes, tempRange: data.tempRange, fssaiNo: data.fssaiNo, unitsAvailable: data.unitsAvailable, pricePerTonDay: data.pricePerTonDay, insuranceCovered: data.insuranceCovered };
+        case "finance":    return { orgName: data.orgName, bankBranch: data.bankBranch, ifscCode: data.ifscCode, designation: data.designation, employeeId: data.employeeId, loanTypes: data.loanTypes, maxLoanAmount: data.maxLoanAmount, interestRate: data.interestRate };
+        case "fpo":        return { orgName: data.orgName, orgType: data.orgType, regNo: data.regNo, designation: data.designation, memberCount: data.memberCount, clusterDistrict: data.clusterDistrict, govtSchemes: data.govtSchemes, certAuthority: data.certAuthority };
+        case "analytics":  return { analyticsOrg: data.analyticsOrg, designation: data.designation, researchFocus: data.researchFocus, toolsUsed: data.toolsUsed, reportFrequency: data.reportFrequency };
+        case "admin":      return { adminOrg: data.adminOrg, designation: data.designation, accessLevel: data.accessLevel };
+        default: return undefined;
+      }
+    })();
+
     setTimeout(() => {
       setSubmitting(false);
-      setUser({ role: selectedRole, name: data.name, location: `${data.location}, ${data.state}`, email: data.email });
+      setUser({
+        role: selectedRole,
+        name: data.name,
+        location: `${data.location}, ${data.state}`,
+        email: data.email,
+        phone: data.phone,
+        district: data.district,
+        state: data.state,
+        pincode: data.pincode,
+        profile,
+      });
       navigate(roleData.path);
     }, 1100);
   };
