@@ -500,7 +500,7 @@ export default function FarmerDashboard() {
                     ].map((f) => (
                       <div key={f.key} className="space-y-1">
                         <Label className="text-xs">{f.label}</Label>
-                        <Input value={(farmData as any)[f.key]} onChange={(e) => setFarmData(prev => ({ ...prev, [f.key]: e.target.value }))} className="text-sm" />
+                        <Input value={(farmData as any)[f.key]} onChange={(_e) => toast({ title: "Update your profile to change farm details" })} className="text-sm" />
                       </div>
                     ))}
                     <div className="sm:col-span-2">
