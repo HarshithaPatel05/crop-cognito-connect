@@ -1095,7 +1095,6 @@ export default function FarmerDashboard() {
       </Dialog>
 
       <VoiceAssistant />
-    </AppLayout>
 
       {/* ── Targeted Vehicle Booking Dialog ── */}
       <Dialog open={vehicleBookingMode === "targeted"} onOpenChange={(open) => !open && setVehicleBookingMode(null)}>
@@ -1106,13 +1105,68 @@ export default function FarmerDashboard() {
             </DialogTitle>
             {targetVehicle && (
               <DialogDescription className="text-xs">
-                {targetVehicle.vehicleNo} · {targetVehicle.vehicleType} · {targetVehicle.capacityTon}T capacity
+                {targetVehicle.vehicleNo} · {targetVehicle.vehicleType} · {targetVehicle.capacityTon}T
                 {targetVehicle.isRefrigerated ? " · ❄️ Refrigerated" : ""}
-                · <StarRating rating={targetVehicle.rating} size="sm" showValue /> · {targetVehicle.totalTrips} trips
+                · Rating {targetVehicle.rating}/5 · {targetVehicle.totalTrips} trips completed
               </DialogDescription>
             )}
           </DialogHeader>
-          <VehicleBookingForm form={vehicleForm} setForm={setVF} primaryCrop={primaryCrop} />
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1 col-span-2 sm:col-span-1">
+                <Label className="text-xs">Product / Crop *</Label>
+                <Select value={vehicleForm.product} onValueChange={(v) => setVF("product", v)}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select crop" /></SelectTrigger>
+                  <SelectContent>{CROPS_LIST.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              {vehicleForm.product === "Other" && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Specify Crop *</Label>
+                  <Input className="h-9 text-sm" placeholder="e.g. Brinjal" value={vehicleForm.customProduct} onChange={e => setVF("customProduct", e.target.value)} />
+                </div>
+              )}
+              <div className="space-y-1">
+                <Label className="text-xs">Total Load Weight (kg) *</Label>
+                <Input className="h-9 text-sm" type="number" placeholder="e.g. 3500" value={vehicleForm.weightKg} onChange={e => setVF("weightKg", e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Pickup Location *</Label>
+                <Input className="h-9 text-sm" placeholder="e.g. Warangal" value={vehicleForm.pickupLocation} onChange={e => setVF("pickupLocation", e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Drop Location *</Label>
+                <Input className="h-9 text-sm" placeholder="e.g. Hyderabad" value={vehicleForm.dropLocation} onChange={e => setVF("dropLocation", e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Pickup Date *</Label>
+                <Input className="h-9 text-sm" type="date" value={vehicleForm.date} onChange={e => setVF("date", e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Pickup Time *</Label>
+                <Input className="h-9 text-sm" type="time" value={vehicleForm.time} onChange={e => setVF("time", e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Your Offered Price (₹) *</Label>
+                <Input className="h-9 text-sm" type="number" placeholder="e.g. 2800" value={vehicleForm.offeredPrice} onChange={e => setVF("offeredPrice", e.target.value)} />
+                <p className="text-[10px] text-muted-foreground">Owner can send a counter offer</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Your Phone Number *</Label>
+                <Input className="h-9 text-sm" type="tel" placeholder="e.g. 98765 43210" value={vehicleForm.phone} onChange={e => setVF("phone", e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Additional Notes</Label>
+              <Input className="h-9 text-sm" placeholder="e.g. Urgent, fragile produce..." value={vehicleForm.notes} onChange={e => setVF("notes", e.target.value)} />
+            </div>
+          </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" size="sm" onClick={() => setVehicleBookingMode(null)}>Cancel</Button>
             <Button size="sm" className="bg-primary" onClick={handleSubmitTargetedVehicle}>
@@ -1127,7 +1181,7 @@ export default function FarmerDashboard() {
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <span>📡</span> Broadcast Request
+              <span>📡</span> Broadcast Request to Multiple Vehicles
             </DialogTitle>
             <DialogDescription className="text-xs">
               {selectedVehicleIds.length > 0
@@ -1136,15 +1190,70 @@ export default function FarmerDashboard() {
             </DialogDescription>
           </DialogHeader>
           {/* Vehicle list preview */}
-          <div className="flex flex-wrap gap-1 pb-2 border-b border-border">
+          <div className="flex flex-wrap gap-1 pb-3 border-b border-border">
             {(selectedVehicleIds.length > 0 ? selectedVehicleIds : AVAILABLE_VEHICLES.map(v => v.id)).map(id => {
-              const v = AVAILABLE_VEHICLES.find(x => x.id === id);
-              return v ? (
-                <span key={id} className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground">🚛 {v.ownerName}</span>
+              const veh = AVAILABLE_VEHICLES.find(x => x.id === id);
+              return veh ? (
+                <span key={id} className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground">🚛 {veh.ownerName}</span>
               ) : null;
             })}
           </div>
-          <VehicleBookingForm form={vehicleForm} setForm={setVF} primaryCrop={primaryCrop} />
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1 col-span-2 sm:col-span-1">
+                <Label className="text-xs">Product / Crop *</Label>
+                <Select value={vehicleForm.product} onValueChange={(v) => setVF("product", v)}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select crop" /></SelectTrigger>
+                  <SelectContent>{CROPS_LIST.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              {vehicleForm.product === "Other" && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Specify Crop *</Label>
+                  <Input className="h-9 text-sm" placeholder="e.g. Brinjal" value={vehicleForm.customProduct} onChange={e => setVF("customProduct", e.target.value)} />
+                </div>
+              )}
+              <div className="space-y-1">
+                <Label className="text-xs">Total Load Weight (kg) *</Label>
+                <Input className="h-9 text-sm" type="number" placeholder="e.g. 3500" value={vehicleForm.weightKg} onChange={e => setVF("weightKg", e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Pickup Location *</Label>
+                <Input className="h-9 text-sm" placeholder="e.g. Warangal" value={vehicleForm.pickupLocation} onChange={e => setVF("pickupLocation", e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Drop Location *</Label>
+                <Input className="h-9 text-sm" placeholder="e.g. Hyderabad" value={vehicleForm.dropLocation} onChange={e => setVF("dropLocation", e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Pickup Date *</Label>
+                <Input className="h-9 text-sm" type="date" value={vehicleForm.date} onChange={e => setVF("date", e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Pickup Time *</Label>
+                <Input className="h-9 text-sm" type="time" value={vehicleForm.time} onChange={e => setVF("time", e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Your Offered Price (₹) *</Label>
+                <Input className="h-9 text-sm" type="number" placeholder="e.g. 2800" value={vehicleForm.offeredPrice} onChange={e => setVF("offeredPrice", e.target.value)} />
+                <p className="text-[10px] text-muted-foreground">Each owner can counter individually</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Your Phone Number *</Label>
+                <Input className="h-9 text-sm" type="tel" placeholder="e.g. 98765 43210" value={vehicleForm.phone} onChange={e => setVF("phone", e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Additional Notes</Label>
+              <Input className="h-9 text-sm" placeholder="e.g. Urgent, festival delivery..." value={vehicleForm.notes} onChange={e => setVF("notes", e.target.value)} />
+            </div>
+          </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" size="sm" onClick={() => setVehicleBookingMode(null)}>Cancel</Button>
             <Button size="sm" className="bg-primary" onClick={handleSubmitBroadcast}>
