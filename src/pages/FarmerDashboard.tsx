@@ -19,6 +19,7 @@ import { AI_RECOMMENDATIONS, STORAGE_UNITS } from "@/data/mockData";
 import { useToast } from "@/hooks/use-toast";
 import { useTransportBooking } from "@/context/TransportBookingContext";
 import { useStorageBooking, StorageType } from "@/context/StorageBookingContext";
+import { useRole, FarmerProfile } from "@/context/RoleContext";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 const PRICE_HISTORY = [
