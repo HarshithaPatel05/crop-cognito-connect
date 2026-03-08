@@ -326,9 +326,9 @@ function VehicleCard({
 
         {/* Rating + trips */}
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-2">
-            <StarRating rating={v.rating} size="sm" showValue />
-            <span className="text-[10px] text-muted-foreground">{v.totalTrips} trips</span>
+          <div className="flex flex-col gap-0.5">
+            <RatingBadge targetId={v.id} showReviews={false} size="sm" />
+            <span className="text-[10px] text-muted-foreground">{v.totalTrips} trips · {v.onTimeRate}% on-time</span>
           </div>
           <div className="text-[10px] text-muted-foreground">⛽ {v.fuelType}</div>
         </div>
