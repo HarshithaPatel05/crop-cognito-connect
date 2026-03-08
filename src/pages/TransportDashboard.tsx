@@ -1284,6 +1284,238 @@ export default function TransportDashboard() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* ════════════════════════════════════════════════════════════════
+              TAB: ROUTE DEMAND ANALYSIS
+          ════════════════════════════════════════════════════════════════ */}
+          <TabsContent value="demand" className="mt-4 space-y-5">
+
+            {/* Header */}
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h3 className="font-semibold text-sm">📊 Route Demand Intelligence</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Where is transport demand highest? Which routes earn more?</p>
+              </div>
+              <Badge className="bg-primary/10 text-primary border border-primary/20 text-xs">Last 6 months · Telangana Region</Badge>
+            </div>
+
+            {/* Top KPIs */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard title="Highest Demand Route" value="Wgl → Hyd" subtext="38 bookings · 94 demand score" icon="🔥" highlight />
+              <StatCard title="Fastest Growing Route" value="Wgl → Chennai" subtext="+31% MoM growth" icon="📈" />
+              <StatCard title="Biggest Market" value="Hyderabad" subtext="118 bookings as destination" icon="🏙️" />
+              <StatCard title="Top Origin City" value="Warangal" subtext="60 bookings originated" icon="📍" />
+            </div>
+
+            {/* Route Demand Ranking */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">🏆 Route Demand Ranking — Bookings & Revenue</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {ROUTE_DEMAND_DATA.map((r, idx) => {
+                  const maxScore = ROUTE_DEMAND_DATA[0].demandScore;
+                  const pct = Math.round((r.demandScore / maxScore) * 100);
+                  const growthColor = r.growthPct >= 20 ? "text-primary" : r.growthPct >= 0 ? "text-yellow-600" : "text-destructive";
+                  return (
+                    <div key={r.route} className={`rounded-xl border p-3 space-y-2 ${idx === 0 ? "border-primary/40 bg-primary/5" : "border-border bg-background"}`}>
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-bold w-5 text-center ${idx === 0 ? "text-primary" : "text-muted-foreground"}`}>#{idx + 1}</span>
+                          <div>
+                            <span className="font-semibold text-sm">{r.route}</span>
+                            <span className="text-xs text-muted-foreground ml-2">🛣️ {r.distKm} km · 🌾 {r.topCrop}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs flex-wrap">
+                          <span className="font-semibold text-primary">₹{r.revenue.toLocaleString()}</span>
+                          <span className="text-muted-foreground">{r.bookings} trips · {r.weightTon}T</span>
+                          <span className={`font-semibold ${growthColor}`}>{r.growthPct >= 0 ? "↑" : "↓"} {Math.abs(r.growthPct)}% growth</span>
+                          <Badge className={`text-[9px] ${r.demandScore >= 80 ? "bg-primary text-primary-foreground" : r.demandScore >= 60 ? "bg-yellow-500/20 text-yellow-700 border border-yellow-500/30" : "bg-muted text-muted-foreground"}`}>
+                            {r.demandScore >= 80 ? "🔥 Hot" : r.demandScore >= 60 ? "📈 Warm" : "💤 Low"} ({r.demandScore})
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                          <div className="h-2 rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="text-[10px] text-muted-foreground w-12 text-right">₹{r.avgPrice}/trip avg</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+
+            {/* Charts row 1 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+              {/* Bar: bookings by route */}
+              <Card>
+                <CardHeader className="pb-2"><CardTitle className="text-sm">📦 Bookings by Route</CardTitle></CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={ROUTE_DEMAND_DATA} layout="vertical" margin={{ left: 10, right: 16, top: 4, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                      <XAxis type="number" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                      <YAxis dataKey="route" type="category" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} width={110} />
+                      <Tooltip
+                        contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 11 }}
+                        formatter={(v: number) => [`${v} bookings`]}
+                      />
+                      <Bar dataKey="bookings" radius={[0, 4, 4, 0]}>
+                        {ROUTE_DEMAND_DATA.map((_, i) => (
+                          <Cell key={i} fill={i === 0 ? "hsl(var(--primary))" : i === 1 ? "hsl(var(--primary)/0.75)" : `hsl(var(--primary)/${Math.max(30, 60 - i * 8)}%)`} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              {/* Bar: revenue by route */}
+              <Card>
+                <CardHeader className="pb-2"><CardTitle className="text-sm">💰 Revenue by Route (₹)</CardTitle></CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={ROUTE_DEMAND_DATA} layout="vertical" margin={{ left: 10, right: 16, top: 4, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                      <XAxis type="number" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+                      <YAxis dataKey="route" type="category" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} width={110} />
+                      <Tooltip
+                        contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 11 }}
+                        formatter={(v: number) => [`₹${v.toLocaleString()}`]}
+                      />
+                      <Bar dataKey="revenue" radius={[0, 4, 4, 0]}>
+                        {ROUTE_DEMAND_DATA.map((_, i) => (
+                          <Cell key={i} fill={DEMAND_COLORS[i % DEMAND_COLORS.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Charts row 2 */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+              {/* Origin demand pie */}
+              <Card>
+                <CardHeader className="pb-2"><CardTitle className="text-sm">📍 Demand by Origin City</CardTitle></CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <PieChart>
+                      <Pie data={ORIGIN_DEMAND} cx="50%" cy="50%" outerRadius={65} dataKey="bookings"
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false} fontSize={10}>
+                        {ORIGIN_DEMAND.map((_, i) => <Cell key={i} fill={DEMAND_COLORS[i % DEMAND_COLORS.length]} />)}
+                      </Pie>
+                      <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 11 }}
+                        formatter={(v: number) => [`${v} bookings`]} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              {/* Destination demand pie */}
+              <Card>
+                <CardHeader className="pb-2"><CardTitle className="text-sm">🏙️ Demand by Destination Market</CardTitle></CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <PieChart>
+                      <Pie data={DEST_DEMAND} cx="50%" cy="50%" outerRadius={65} dataKey="bookings"
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false} fontSize={10}>
+                        {DEST_DEMAND.map((_, i) => <Cell key={i} fill={DEMAND_COLORS[(i + 3) % DEMAND_COLORS.length]} />)}
+                      </Pie>
+                      <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 11 }}
+                        formatter={(v: number) => [`${v} bookings`]} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              {/* Weekly demand pattern */}
+              <Card>
+                <CardHeader className="pb-2"><CardTitle className="text-sm">📅 Weekly Demand Pattern</CardTitle></CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={WEEKLY_DEMAND} barSize={22}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="day" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                      <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} width={28} />
+                      <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 11 }}
+                        formatter={(v: number, name: string) => [name === "bookings" ? `${v} bookings` : `${v}% avg load`, name === "bookings" ? "Bookings" : "Avg Load %"]} />
+                      <Bar dataKey="bookings" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="avgLoad" fill="hsl(var(--muted-foreground)/0.3)" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                  <p className="text-[10px] text-muted-foreground mt-2 text-center">📌 Friday–Saturday peak: plan extra vehicles</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Monthly trend */}
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">📈 Monthly Booking & Revenue Trend</CardTitle></CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={180}>
+                  <LineChart data={MONTHLY_TREND} margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                    <YAxis yAxisId="left" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} width={28} />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={v => `₹${(v/1000).toFixed(0)}k`} width={44} />
+                    <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 11 }}
+                      formatter={(v: number, name: string) => [name === "bookings" ? `${v} trips` : `₹${v.toLocaleString()}`, name === "bookings" ? "Bookings" : "Revenue"]} />
+                    <Legend wrapperStyle={{ fontSize: 10 }} />
+                    <Line yAxisId="left" type="monotone" dataKey="bookings" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3 }} name="bookings" />
+                    <Line yAxisId="right" type="monotone" dataKey="revenue" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} name="revenue" strokeDasharray="4 2" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            {/* Crop demand by route radar */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">🌾 Crop Demand Distribution Across Top Routes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={260}>
+                  <RadarChart data={CROP_ROUTE_DEMAND} margin={{ top: 8, right: 32, bottom: 8, left: 32 }}>
+                    <PolarGrid stroke="hsl(var(--border))" />
+                    <PolarAngleAxis dataKey="route" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                    <PolarRadiusAxis angle={30} domain={[0, 50]} tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
+                    {["Tomato", "Onion", "Chilli", "Turmeric", "Rice"].map((crop, i) => (
+                      <Radar key={crop} name={crop} dataKey={crop} stroke={DEMAND_COLORS[i]} fill={DEMAND_COLORS[i]} fillOpacity={0.12} strokeWidth={1.5} />
+                    ))}
+                    <Legend wrapperStyle={{ fontSize: 10 }} />
+                    <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 11 }} />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            {/* Insight cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                { emoji: "🔥", title: "Peak Demand Zone", body: "Warangal–Karimnagar corridor drives 58% of all bookings. Position your vehicle here during Fri–Sat for maximum utilisation." },
+                { emoji: "💡", title: "Underserved Route Opportunity", body: "Adilabad → Nagpur shows +22% growth but only 19 bookings. Early market entry with competitive pricing could capture strong share." },
+                { emoji: "📈", title: "Long-Haul Revenue Insight", body: "Warangal → Chennai earns ₹4,142/trip avg vs ₹2,158 for local routes. Just 2 long-haul trips/month = 4× the revenue." },
+              ].map(c => (
+                <Card key={c.title} className="border-border bg-muted/20">
+                  <CardContent className="p-4 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">{c.emoji}</span>
+                      <span className="font-semibold text-xs">{c.title}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{c.body}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+          </TabsContent>
         </Tabs>
       </div>
       <VoiceAssistant />
