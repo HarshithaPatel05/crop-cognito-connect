@@ -29,6 +29,61 @@ const PRICE_HISTORY = [
   { day: "Oct 5", price: 25 }, { day: "Oct 10", price: 28 }, { day: "Oct 15", price: 32 },
 ];
 
+// ── Market trends & AI prediction data ───────────────────────────────────────
+const PRICE_TREND_12W = [
+  { week: "W1 Aug", tomato: 18, onion: 14, chilli: 32, rice: 22 },
+  { week: "W2 Aug", tomato: 20, onion: 15, chilli: 34, rice: 22 },
+  { week: "W3 Aug", tomato: 19, onion: 16, chilli: 33, rice: 23 },
+  { week: "W4 Aug", tomato: 21, onion: 17, chilli: 36, rice: 23 },
+  { week: "W1 Sep", tomato: 23, onion: 18, chilli: 38, rice: 24 },
+  { week: "W2 Sep", tomato: 25, onion: 19, chilli: 37, rice: 24 },
+  { week: "W3 Sep", tomato: 26, onion: 21, chilli: 39, rice: 24 },
+  { week: "W4 Sep", tomato: 28, onion: 22, chilli: 41, rice: 25 },
+  { week: "W1 Oct", tomato: 30, onion: 24, chilli: 43, rice: 25 },
+  { week: "W2 Oct", tomato: 29, onion: 25, chilli: 42, rice: 26 },
+  { week: "W3 Oct", tomato: 32, onion: 26, chilli: 44, rice: 26 },
+  { week: "W4 Oct", tomato: 35, onion: 27, chilli: 47, rice: 27 },
+];
+
+const BUYER_DEMAND = [
+  { market: "Hyd Rythu Bazar", demand: 92, buyers: 28, avgQty: 12 },
+  { market: "Secunderabad", demand: 84, buyers: 21, avgQty: 9 },
+  { market: "Warangal Local", demand: 61, buyers: 14, avgQty: 7 },
+  { market: "Karimnagar APMC", demand: 78, buyers: 18, avgQty: 10 },
+  { market: "Nizamabad Hub", demand: 69, buyers: 16, avgQty: 8 },
+];
+
+const AI_PREDICTIONS = [
+  { crop: "Tomato",   currentPrice: 32, predictedHigh: 42, predictedLow: 28, confidence: 87, bestWindow: "Oct 20–25", signal: "SELL NOW" },
+  { crop: "Onion",    currentPrice: 27, predictedHigh: 35, predictedLow: 24, confidence: 81, bestWindow: "Nov 1–7",   signal: "HOLD" },
+  { crop: "Chilli",   currentPrice: 44, predictedHigh: 52, predictedLow: 40, confidence: 76, bestWindow: "Oct 28–Nov 3", signal: "HOLD" },
+  { crop: "Turmeric", currentPrice: 88, predictedHigh: 96, predictedLow: 82, confidence: 72, bestWindow: "Nov 5–12", signal: "HOLD" },
+];
+
+// ── Nearby farmers mock data ──────────────────────────────────────────────────
+interface NearbyFarmer {
+  id: string; name: string; village: string;
+  lat: number; lng: number;
+  crop: string; area: string;
+  harvestDate: string; phone: string;
+  rating: number; tradeGroup?: string;
+}
+
+const NEARBY_FARMERS: NearbyFarmer[] = [
+  { id: "F1", name: "Prakash Rao",   village: "Hanamkonda", lat: 18.0031, lng: 79.5540, crop: "Tomato",   area: "4.2 ac", harvestDate: "Oct 18", phone: "98765 11223", rating: 4.5, tradeGroup: "Tomato Growers Cluster" },
+  { id: "F2", name: "Anand Reddy",   village: "Kazipet",    lat: 17.9524, lng: 79.5100, crop: "Tomato",   area: "2.8 ac", harvestDate: "Oct 20", phone: "97654 22334", rating: 4.2, tradeGroup: "Tomato Growers Cluster" },
+  { id: "F3", name: "Laxmi Devi",    village: "Narsampet",  lat: 17.9260, lng: 79.8960, crop: "Onion",    area: "3.5 ac", harvestDate: "Nov 5",  phone: "96543 33445", rating: 4.7 },
+  { id: "F4", name: "Raju Nair",     village: "Parkal",     lat: 18.1980, lng: 79.7150, crop: "Chilli",   area: "5.0 ac", harvestDate: "Oct 28", phone: "95432 44556", rating: 4.3 },
+  { id: "F5", name: "Meena Bai",     village: "Bhupalpally",lat: 18.4390, lng: 79.9780, crop: "Turmeric", area: "6.1 ac", harvestDate: "Dec 10", phone: "94321 55667", rating: 4.8 },
+  { id: "F6", name: "Gopi Krishna",  village: "Mahabubabad",lat: 17.5990, lng: 80.0040, crop: "Rice",     area: "7.3 ac", harvestDate: "Nov 20", phone: "93210 66778", rating: 4.1 },
+  { id: "F7", name: "Sunita Patel",  village: "Kodad",      lat: 17.7000, lng: 79.9500, crop: "Tomato",   area: "2.1 ac", harvestDate: "Oct 22", phone: "92109 77889", rating: 4.4, tradeGroup: "Tomato Growers Cluster" },
+];
+
+const CROP_COLORS_MAP: Record<string, string> = {
+  Tomato: "#ef4444", Onion: "#a78bfa", Chilli: "#f97316",
+  Turmeric: "#eab308", Rice: "#84cc16", Wheat: "#d97706",
+};
+
 const QUICK_ACTIONS = [
   { icon: "📋", label: "List Crop for Sale" },
   { icon: "🚚", label: "Find Transport" },
