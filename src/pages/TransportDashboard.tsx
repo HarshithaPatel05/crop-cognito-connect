@@ -15,7 +15,8 @@ import { useTransportBooking } from "@/context/TransportBookingContext";
 import { useRole, TransportProfile } from "@/context/RoleContext";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell,
+  PieChart, Pie, Cell, LineChart, Line, RadarChart, Radar, PolarGrid,
+  PolarAngleAxis, PolarRadiusAxis, Legend,
 } from "recharts";
 
 // ── Distance table (approximate km) ──────────────────────────────────────────
