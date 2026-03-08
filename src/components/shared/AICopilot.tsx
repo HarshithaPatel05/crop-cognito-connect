@@ -205,38 +205,25 @@ export function AICopilot() {
     });
   };
 
-  const speak = async (text: string, idx: number) => {
+  const speak = (text: string, idx: number) => {
     // Stop if already speaking this message
     if (speakingIdx === idx) {
-      audioRef.current?.pause();
-      audioRef.current = null;
+      window.speechSynthesis?.cancel();
       setSpeakingIdx(null);
       setTtsLoading(false);
       return;
     }
-    // Stop any currently playing audio
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-      setSpeakingIdx(null);
-    }
+    // Stop any currently playing
+    window.speechSynthesis?.cancel();
+    setSpeakingIdx(null);
 
-    const audio = await playElevenLabsTTS(
+    setSpeakingIdx(idx);
+    playTTS(
       text,
       lang,
-      supabaseUrl,
-      publishableKey,
-      () => { setTtsLoading(true); },
-      () => { setTtsLoading(false); audioRef.current = null; setSpeakingIdx(null); },
-      () => { setTtsLoading(false); setSpeakingIdx(idx); },
+      () => { setSpeakingIdx(idx); },
+      () => { setSpeakingIdx(null); setTtsLoading(false); },
     );
-
-    if (audio) {
-      audioRef.current = audio;
-      // onStart fires before play, but we need to update speakingIdx after audio is returned
-      setSpeakingIdx(idx);
-      setTtsLoading(false);
-    }
   };
 
   const toggleVoice = () => {
