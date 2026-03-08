@@ -255,6 +255,7 @@ export function AICopilot() {
 
     const audio = await playElevenLabsTTS(
       text,
+      lang,
       supabaseUrl,
       publishableKey,
       () => { setTtsLoading(true); },
