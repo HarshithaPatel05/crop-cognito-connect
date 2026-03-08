@@ -671,20 +671,23 @@ export default function FarmerDashboard() {
                 <TabsTrigger value="findtransport">🔍 Find Transport</TabsTrigger>
                 <TabsTrigger value="transport" className="relative">
                   🚚 My Bookings
-                  {pendingCounter > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-accent text-foreground text-[9px] font-bold rounded-full px-1 leading-4 min-w-[16px] text-center">
-                      {pendingCounter}
+                  {transportAlerts > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-[9px] font-bold rounded-full px-1 leading-4 min-w-[16px] text-center animate-pulse">
+                      {transportAlerts}
                     </span>
                   )}
                 </TabsTrigger>
                 <TabsTrigger value="storage" className="relative">
                   🏪 Storage
                   {pendingStorage > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-accent text-foreground text-[9px] font-bold rounded-full px-1 leading-4 min-w-[16px] text-center">
+                    <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-[9px] font-bold rounded-full px-1 leading-4 min-w-[16px] text-center animate-pulse">
                       {pendingStorage}
                     </span>
                   )}
                 </TabsTrigger>
+                <TabsTrigger value="photos">📸 Crop Photos</TabsTrigger>
+                <TabsTrigger value="trends">📊 Market Trends</TabsTrigger>
+                <TabsTrigger value="nearby">🗺️ Nearby Farmers</TabsTrigger>
                 <TabsTrigger value="register">Farm Details</TabsTrigger>
                 <TabsTrigger value="market">Market Intel</TabsTrigger>
               </TabsList>
