@@ -776,7 +776,7 @@ export default function FarmerDashboard() {
                     const otherFarmers = conflict.farmerNames.filter(n => n !== farmerName);
                     return (
                       <Card key={`conflict-${conflict.vehicleId}-${conflict.date}-${conflict.time}`}
-                        className="border-2 border-yellow-500/60 bg-yellow-500/5">
+                        className="border-2 border-accent/60 bg-accent/5">
                         <CardContent className="p-4">
                           <div className="flex items-start gap-3">
                             <span className="text-2xl">⚠️</span>
@@ -791,10 +791,10 @@ export default function FarmerDashboard() {
                                 {" "}on the same trip.
                               </p>
                               <div className="flex items-center gap-3 mt-2 flex-wrap">
-                                <span className="inline-flex items-center gap-1.5 bg-yellow-500/10 border border-yellow-500/30 text-yellow-700 dark:text-yellow-400 rounded-full px-3 py-1 text-xs font-semibold">
+                                <span className="inline-flex items-center gap-1.5 bg-accent/10 border border-accent/30 text-foreground rounded-full px-3 py-1 text-xs font-semibold">
                                   📅 {conflict.date}
                                 </span>
-                                <span className="inline-flex items-center gap-1.5 bg-yellow-500/10 border border-yellow-500/30 text-yellow-700 dark:text-yellow-400 rounded-full px-3 py-1 text-xs font-semibold">
+                                <span className="inline-flex items-center gap-1.5 bg-accent/10 border border-accent/30 text-foreground rounded-full px-3 py-1 text-xs font-semibold">
                                   🕐 Pickup at {conflict.time}
                                 </span>
                                 {vehicle && (
@@ -804,7 +804,7 @@ export default function FarmerDashboard() {
                                 )}
                               </div>
                               <p className="text-xs text-muted-foreground mt-1">
-                                Please be ready at <span className="font-semibold">{b_pickupFor(conflict, myTransportBookings) ?? conflict.time}</span>{" "}
+                                Please be ready at <span className="font-semibold text-foreground">{b_pickupFor(conflict, myTransportBookings) ?? conflict.time}</span>{" "}
                                 — the vehicle will service multiple pickups on this route. Contact{" "}
                                 {vehicle ? <span className="font-medium text-foreground">{vehicle.ownerName} ({vehicle.phone})</span> : "the owner"} for any queries.
                               </p>
