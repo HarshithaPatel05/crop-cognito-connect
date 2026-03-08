@@ -265,6 +265,17 @@ export function AICopilot() {
       lang,
       () => { setSpeakingIdx(idx); },
       () => { setSpeakingIdx(null); setTtsLoading(false); },
+      () => {
+        setSpeakingIdx(null);
+        setTtsLoading(false);
+        toast({
+          title: lang === "te" ? "Telugu voice unavailable" : "Hindi voice unavailable",
+          description: lang === "te"
+            ? "Your device doesn't have a Telugu voice installed. Install a Telugu TTS voice in your system settings to hear responses in Telugu."
+            : "Your device doesn't have a Hindi voice installed. Install a Hindi TTS voice in your system settings to hear responses in Hindi.",
+          duration: 5000,
+        });
+      },
     );
   };
 
