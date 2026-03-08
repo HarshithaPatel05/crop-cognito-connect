@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { RoleProvider } from "@/context/RoleContext";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import FarmerDashboard from "./pages/FarmerDashboard";
@@ -20,26 +21,28 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/farmer" element={<FarmerDashboard />} />
-          <Route path="/marketplace" element={<Marketplace />} />
-          <Route path="/transport" element={<TransportDashboard />} />
-          <Route path="/storage" element={<StorageDashboard />} />
-          <Route path="/waste" element={<WasteManagement />} />
-          <Route path="/finance" element={<Finance />} />
-          <Route path="/analytics" element={<Analytics />} />
-          <Route path="/fpo" element={<FPOPortal />} />
-          <Route path="/admin" element={<AdminPanel />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+    <RoleProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/farmer" element={<FarmerDashboard />} />
+            <Route path="/marketplace" element={<Marketplace />} />
+            <Route path="/transport" element={<TransportDashboard />} />
+            <Route path="/storage" element={<StorageDashboard />} />
+            <Route path="/waste" element={<WasteManagement />} />
+            <Route path="/finance" element={<Finance />} />
+            <Route path="/analytics" element={<Analytics />} />
+            <Route path="/fpo" element={<FPOPortal />} />
+            <Route path="/admin" element={<AdminPanel />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </RoleProvider>
   </QueryClientProvider>
 );
 
