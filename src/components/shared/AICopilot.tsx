@@ -161,12 +161,17 @@ export function AICopilot() {
   };
 
   const toggleVoice = () => {
-    const SpeechRecognition =
-      (window as unknown as { SpeechRecognition?: typeof window.SpeechRecognition; webkitSpeechRecognition?: typeof window.SpeechRecognition })
-        .SpeechRecognition ||
-      (window as unknown as { webkitSpeechRecognition?: typeof window.SpeechRecognition }).webkitSpeechRecognition;
+    type SpeechRecognitionCtor = new () => SpeechRecognitionEvent & {
+      lang: string; interimResults: boolean;
+      onresult: ((e: { results: { [key: number]: { [key: number]: { transcript: string } } } }) => void) | null;
+      onerror: (() => void) | null;
+      onend: (() => void) | null;
+      start: () => void; stop: () => void;
+    };
+    const w = window as unknown as { SpeechRecognition?: SpeechRecognitionCtor; webkitSpeechRecognition?: SpeechRecognitionCtor };
+    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
 
-    if (!SpeechRecognition) {
+    if (!SR) {
       toast({ title: "Not supported", description: "Voice input not supported on this browser." });
       return;
     }
