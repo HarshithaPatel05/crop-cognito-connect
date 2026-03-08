@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,11 +17,14 @@ import { SpoilageRiskMeter } from "@/components/shared/SpoilageRiskMeter";
 import { StatCard } from "@/components/shared/StatCard";
 import { AICopilot } from "@/components/shared/AICopilot";
 import { StarRating } from "@/components/shared/StarRating";
+import { RatingBadge } from "@/components/shared/RatingBadge";
+import { RatingPromptDialog } from "@/components/shared/RatingPromptDialog";
 import { AI_RECOMMENDATIONS, STORAGE_UNITS } from "@/data/mockData";
 import { useToast } from "@/hooks/use-toast";
 import { useTransportBooking, AVAILABLE_VEHICLES, AvailableVehicle } from "@/context/TransportBookingContext";
 import { useStorageBooking, StorageType } from "@/context/StorageBookingContext";
 import { useRole, FarmerProfile } from "@/context/RoleContext";
+import { useRating } from "@/context/RatingContext";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, BarChart, Bar, Legend } from "recharts";
 
 const PRICE_HISTORY = [
@@ -323,9 +326,9 @@ function VehicleCard({
 
         {/* Rating + trips */}
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-2">
-            <StarRating rating={v.rating} size="sm" showValue />
-            <span className="text-[10px] text-muted-foreground">{v.totalTrips} trips</span>
+          <div className="flex flex-col gap-0.5">
+            <RatingBadge targetId={v.id} showReviews={false} size="sm" />
+            <span className="text-[10px] text-muted-foreground">{v.totalTrips} trips · {v.onTimeRate}% on-time</span>
           </div>
           <div className="text-[10px] text-muted-foreground">⛽ {v.fuelType}</div>
         </div>
@@ -366,6 +369,18 @@ export default function FarmerDashboard() {
   const { user } = useRole();
   const { bookings, pickupConflicts, addBooking, addBroadcastBookings, farmerAccept, farmerReject } = useTransportBooking();
   const { bookings: storageBookings, addBooking: addStorageBooking } = useStorageBooking();
+  const { addPending, pending: ratingPending, removePending } = useRating();
+
+  // Pending rating prompt — show one at a time
+  const [activeRatingPrompt, setActiveRatingPrompt] = useState<string | null>(null);
+  const currentRatingPending = ratingPending.find(p => p.bookingId === activeRatingPrompt);
+
+  // Whenever a new pending rating appears, auto-show it
+  useEffect(() => {
+    if (ratingPending.length > 0 && !activeRatingPrompt) {
+      setActiveRatingPrompt(ratingPending[0].bookingId);
+    }
+  }, [ratingPending, activeRatingPrompt]);
 
   const fp = (user?.profile ?? {}) as FarmerProfile;
 
@@ -1017,7 +1032,10 @@ export default function FarmerDashboard() {
                               Owner wants <span className="font-semibold text-foreground">₹{b.counterPrice}</span> (you offered ₹{b.offeredPrice})
                             </p>
                             <Button size="sm" className="bg-primary text-xs h-8"
-                              onClick={() => { farmerAccept(b.id); toast({ title: "✅ Counter accepted! Trip Confirmed 🎉", description: `Confirmed at ₹${b.counterPrice}` }); }}>
+                              onClick={() => {
+                                farmerAccept(b.id);
+                                toast({ title: "✅ Counter accepted! Trip Confirmed 🎉", description: `Confirmed at ₹${b.counterPrice}` });
+                              }}>
                               ✅ Accept ₹{b.counterPrice}
                             </Button>
                             <Button size="sm" variant="outline" className="text-xs h-8 border-destructive/50 text-destructive"
@@ -1032,7 +1050,10 @@ export default function FarmerDashboard() {
                               Owner accepted at your price <span className="font-semibold text-foreground">₹{b.offeredPrice}</span> — confirm to finalise?
                             </p>
                             <Button size="sm" className="bg-primary text-xs h-8"
-                              onClick={() => { farmerAccept(b.id); toast({ title: "🎉 Trip Confirmed!", description: "Both parties agreed — trip is confirmed!" }); }}>
+                              onClick={() => {
+                                farmerAccept(b.id);
+                                toast({ title: "🎉 Trip Confirmed!", description: "Both parties agreed — trip is confirmed!" });
+                              }}>
                               ✅ Confirm Trip
                             </Button>
                             <Button size="sm" variant="outline" className="text-xs h-8 border-destructive/50 text-destructive"
@@ -1041,9 +1062,34 @@ export default function FarmerDashboard() {
                             </Button>
                           </div>
                         )}
-                        {isConfirmed && (
+                        {isConfirmed && vehicleInfo && (
+                          <div className="space-y-2 pt-1 border-t border-primary/20">
+                            <div className="text-xs text-primary font-medium">
+                              ✅ Final price: ₹{b.counterPrice || b.offeredPrice} · {vehicleInfo.ownerName} will contact you at {b.farmerPhone}
+                            </div>
+                            <div className="bg-muted/40 rounded-lg px-3 py-2">
+                              <p className="text-[10px] text-muted-foreground mb-1 font-medium">Farmer Reviews for {vehicleInfo.ownerName}</p>
+                              <RatingBadge targetId={vehicleInfo.id} showReviews />
+                            </div>
+                            <Button size="sm" variant="outline" className="text-xs h-8 border-primary/40 text-primary w-full"
+                              onClick={() => {
+                                addPending({
+                                  bookingId: b.id,
+                                  targetId: vehicleInfo.id,
+                                  targetType: "transport",
+                                  targetName: vehicleInfo.ownerName,
+                                  farmerName: b.farmerName,
+                                  product: b.product,
+                                });
+                                setActiveRatingPrompt(b.id);
+                              }}>
+                              ⭐ Rate this Trip
+                            </Button>
+                          </div>
+                        )}
+                        {isConfirmed && !vehicleInfo && (
                           <div className="text-xs text-primary font-medium pt-1 border-t border-primary/20">
-                            ✅ Final price: ₹{b.counterPrice || b.offeredPrice} · {vehicleInfo ? `${vehicleInfo.ownerName} will contact you at ${b.farmerPhone}` : "Transport owner will contact you soon"}
+                            ✅ Final price: ₹{b.counterPrice || b.offeredPrice} · Transport owner will contact you soon
                           </div>
                         )}
                       </CardContent>
@@ -1117,6 +1163,30 @@ export default function FarmerDashboard() {
                           {b.status === "approved" && (
                             <div className="text-xs text-primary font-medium pt-1 border-t border-primary/20">
                               ✅ Booking approved! Bring your produce to {b.unitName} on {b.checkInDate}.
+                            </div>
+                          )}
+                          {(b.status === "completed" || b.status === "active") && (
+                            <div className="space-y-2 pt-1 border-t border-border">
+                              <div className="bg-muted/40 rounded-lg px-3 py-2">
+                                <p className="text-[10px] text-muted-foreground mb-1 font-medium">Farmer Reviews for {b.unitName}</p>
+                                <RatingBadge targetId={String(b.unitId)} showReviews />
+                              </div>
+                              {b.status === "completed" && (
+                                <Button size="sm" variant="outline" className="text-xs h-8 border-primary/40 text-primary w-full"
+                                  onClick={() => {
+                                    addPending({
+                                      bookingId: b.id,
+                                      targetId: String(b.unitId),
+                                      targetType: "storage",
+                                      targetName: b.unitName,
+                                      farmerName: b.farmerName,
+                                      product: b.crop,
+                                    });
+                                    setActiveRatingPrompt(b.id);
+                                  }}>
+                                  ⭐ Rate this Storage
+                                </Button>
+                              )}
                             </div>
                           )}
                         </CardContent>
@@ -1874,6 +1944,14 @@ export default function FarmerDashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Rating Prompt — auto-surfaces after confirmed trips/storage */}
+      {currentRatingPending && (
+        <RatingPromptDialog
+          pending={currentRatingPending}
+          onClose={() => setActiveRatingPrompt(null)}
+        />
+      )}
 
     </AppLayout>
   );

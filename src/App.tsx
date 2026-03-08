@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { RoleProvider } from "@/context/RoleContext";
 import { TransportBookingProvider } from "@/context/TransportBookingContext";
 import { StorageBookingProvider } from "@/context/StorageBookingContext";
+import { RatingProvider } from "@/context/RatingContext";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -30,23 +31,25 @@ const App = () => (
           <TooltipProvider>
             <Toaster />
             <Sonner />
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/farmer" element={<FarmerDashboard />} />
-                <Route path="/marketplace" element={<Marketplace />} />
-                <Route path="/transport" element={<TransportDashboard />} />
-                <Route path="/storage" element={<StorageDashboard />} />
-                <Route path="/waste" element={<WasteManagement />} />
-                <Route path="/finance" element={<Finance />} />
-                <Route path="/analytics" element={<Analytics />} />
-                <Route path="/fpo" element={<FPOPortal />} />
-                <Route path="/admin" element={<AdminPanel />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
+            <RatingProvider>
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={<Register />} />
+                  <Route path="/farmer" element={<FarmerDashboard />} />
+                  <Route path="/marketplace" element={<Marketplace />} />
+                  <Route path="/transport" element={<TransportDashboard />} />
+                  <Route path="/storage" element={<StorageDashboard />} />
+                  <Route path="/waste" element={<WasteManagement />} />
+                  <Route path="/finance" element={<Finance />} />
+                  <Route path="/analytics" element={<Analytics />} />
+                  <Route path="/fpo" element={<FPOPortal />} />
+                  <Route path="/admin" element={<AdminPanel />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </BrowserRouter>
+            </RatingProvider>
           </TooltipProvider>
         </StorageBookingProvider>
       </TransportBookingProvider>
