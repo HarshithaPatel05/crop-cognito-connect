@@ -390,8 +390,22 @@ export default function FarmerDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [smsCmd, setSmsCmd] = useState("");
 
+  // ── Crop Photos state ───────────────────────────────────────────────────────
+  interface CropPhoto { id: string; url: string; label: string; date: string; note: string; }
+  const [cropPhotos, setCropPhotos] = useState<CropPhoto[]>([
+    { id: "p1", url: "https://images.unsplash.com/photo-1592921870789-04563d55041c?w=400&q=80", label: "Tomato Field", date: "Oct 10", note: "Stage: Fruit Development" },
+    { id: "p2", url: "https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=400&q=80", label: "Ripening Stage", date: "Oct 12", note: "Ready in ~7 days" },
+  ]);
+  const [photoCaption, setPhotoCaption] = useState("");
+  const [photoNote, setPhotoNote] = useState("");
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Nearby farmers state ────────────────────────────────────────────────────
+  const [selectedFarmer, setSelectedFarmer] = useState<NearbyFarmer | null>(null);
+  const [tradeGroupJoined, setTradeGroupJoined] = useState<string[]>([]);
+  const [cropFilter, setCropFilter] = useState<string>("All");
+
   // ── Find Transport state ────────────────────────────────────────────────────
-  // null = no dialog, "targeted" = booking one vehicle, "broadcast" = broadcasting to all selected
   const [vehicleBookingMode, setVehicleBookingMode] = useState<null | "targeted" | "broadcast">(null);
   const [targetVehicle, setTargetVehicle] = useState<AvailableVehicle | null>(null);
   const [selectedVehicleIds, setSelectedVehicleIds] = useState<string[]>([]);
@@ -411,15 +425,16 @@ export default function FarmerDashboard() {
   const myTransportBookings = bookings.filter(b => b.farmerName === farmerName);
   const myStorageBookings = storageBookings.filter(b => b.farmerName === farmerName);
 
+  // ── Notification counts ─────────────────────────────────────────────────────
   const pendingCounter = myTransportBookings.filter(b => b.status === "counter-sent").length;
+  const pendingAccepted = myTransportBookings.filter(b => b.status === "accepted").length;
+  const transportAlerts = pendingCounter + pendingAccepted;
   const pendingStorage = myStorageBookings.filter(b => b.status === "pending").length;
 
   const setTF = (key: keyof TransportForm, val: string) =>
     setTransportForm(p => ({ ...p, [key]: val }));
-
   const setSF = (key: keyof StorageForm, val: string) =>
     setStorageForm(p => ({ ...p, [key]: val }));
-
   const setVF = (key: keyof TransportForm, val: string) =>
     setVehicleForm(p => ({ ...p, [key]: val }));
 
@@ -442,10 +457,32 @@ export default function FarmerDashboard() {
     });
   }, [vehicleFilter]);
 
+  // ── Crop photo upload handler ───────────────────────────────────────────────
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const url = ev.target?.result as string;
+      const now = new Date();
+      setCropPhotos(prev => [{
+        id: `p${Date.now()}`, url,
+        label: photoCaption || `${primaryCrop} Photo`,
+        date: now.toLocaleDateString("en-IN", { day: "numeric", month: "short" }),
+        note: photoNote || "Just uploaded",
+      }, ...prev]);
+      setPhotoCaption(""); setPhotoNote("");
+      toast({ title: "📸 Crop photo uploaded!", description: "Photo added to your gallery." });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
   const handleSMS = () => {
     if (!smsCmd.trim()) return;
     toast({ title: "SMS Command Processed ✅", description: `Data updated from: "${smsCmd}"` });
     setSmsCmd("");
+
   };
 
   const handleAction = (label: string) => {
