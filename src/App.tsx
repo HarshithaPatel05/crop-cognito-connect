@@ -25,27 +25,28 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <RoleProvider>
       <TransportBookingProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/farmer" element={<FarmerDashboard />} />
-            <Route path="/marketplace" element={<Marketplace />} />
-            <Route path="/transport" element={<TransportDashboard />} />
-            <Route path="/storage" element={<StorageDashboard />} />
-            <Route path="/waste" element={<WasteManagement />} />
-            <Route path="/finance" element={<Finance />} />
-            <Route path="/analytics" element={<Analytics />} />
-            <Route path="/fpo" element={<FPOPortal />} />
-            <Route path="/admin" element={<AdminPanel />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/farmer" element={<FarmerDashboard />} />
+              <Route path="/marketplace" element={<Marketplace />} />
+              <Route path="/transport" element={<TransportDashboard />} />
+              <Route path="/storage" element={<StorageDashboard />} />
+              <Route path="/waste" element={<WasteManagement />} />
+              <Route path="/finance" element={<Finance />} />
+              <Route path="/analytics" element={<Analytics />} />
+              <Route path="/fpo" element={<FPOPortal />} />
+              <Route path="/admin" element={<AdminPanel />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </TransportBookingProvider>
     </RoleProvider>
   </QueryClientProvider>
 );
