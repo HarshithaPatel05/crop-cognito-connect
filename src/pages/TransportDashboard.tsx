@@ -569,6 +569,9 @@ export default function TransportDashboard() {
                 <div className="flex-1 min-w-0">
                   <div className="font-bold text-foreground">{ownerName}</div>
                   <div className="text-xs text-muted-foreground">{ownerLoc}</div>
+                  <div className="mt-1">
+                    <RatingBadge targetId={tp.vehicleNo ?? "V-001"} size="sm" showReviews={false} />
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-x-6 gap-y-1 text-xs flex-1">
                   {[
