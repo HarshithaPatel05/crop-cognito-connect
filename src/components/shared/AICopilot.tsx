@@ -17,6 +17,45 @@ const QUICK_PROMPTS: Record<Language, string[]> = {
   hi: ["टमाटर कब बेचें?", "भाड़ा दर क्या है?", "अभी बेचें या रखें?"],
 };
 
+// Play audio from ElevenLabs TTS edge function — falls back to browser TTS on error
+async function playElevenLabsTTS(
+  text: string,
+  supabaseUrl: string,
+  publishableKey: string,
+  onStart: () => void,
+  onEnd: () => void,
+  onError: (msg: string) => void
+): Promise<HTMLAudioElement | null> {
+  onStart();
+  try {
+    const resp = await fetch(`${supabaseUrl}/functions/v1/elevenlabs-tts`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: publishableKey,
+        Authorization: `Bearer ${publishableKey}`,
+      },
+      body: JSON.stringify({ text }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || `TTS error ${resp.status}`);
+    }
+
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    audio.onended = () => { URL.revokeObjectURL(url); onEnd(); };
+    audio.onerror = () => { URL.revokeObjectURL(url); onError("Audio playback failed"); };
+    await audio.play();
+    return audio;
+  } catch (e) {
+    onError(e instanceof Error ? e.message : "TTS failed");
+    return null;
+  }
+}
+
 // Stream SSE response from edge function
 async function streamCopilot({
   messages,
