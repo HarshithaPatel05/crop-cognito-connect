@@ -264,7 +264,7 @@ export function AICopilot() {
               variant="ghost"
               size="icon"
               className="h-7 w-7 text-primary-foreground hover:bg-primary/60 flex-shrink-0"
-              onClick={() => setOpen(false)}
+              onClick={() => { window.speechSynthesis?.cancel(); setSpeakingIdx(null); setOpen(false); }}
             >
               <X className="w-4 h-4" />
             </Button>
