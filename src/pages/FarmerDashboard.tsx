@@ -862,7 +862,7 @@ export default function FarmerDashboard() {
                               <Badge variant="outline" className="text-[10px] text-muted-foreground">📡 Broadcast</Badge>
                             )}
                             {conflict && (
-                              <Badge className="text-[10px] bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border border-yellow-500/40">
+                              <Badge className="text-[10px] bg-accent/20 text-foreground border border-accent/40">
                                 ⚠️ Shared Trip
                               </Badge>
                             )}
