@@ -369,6 +369,18 @@ export default function FarmerDashboard() {
   const { user } = useRole();
   const { bookings, pickupConflicts, addBooking, addBroadcastBookings, farmerAccept, farmerReject } = useTransportBooking();
   const { bookings: storageBookings, addBooking: addStorageBooking } = useStorageBooking();
+  const { addPending, pending: ratingPending, removePending } = useRating();
+
+  // Pending rating prompt — show one at a time
+  const [activeRatingPrompt, setActiveRatingPrompt] = useState<string | null>(null);
+  const currentRatingPending = ratingPending.find(p => p.bookingId === activeRatingPrompt);
+
+  // Whenever a new pending rating appears, auto-show it
+  useEffect(() => {
+    if (ratingPending.length > 0 && !activeRatingPrompt) {
+      setActiveRatingPrompt(ratingPending[0].bookingId);
+    }
+  }, [ratingPending, activeRatingPrompt]);
 
   const fp = (user?.profile ?? {}) as FarmerProfile;
 
