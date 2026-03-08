@@ -208,8 +208,8 @@ export default function FarmerDashboard() {
       <div className="space-y-6 animate-fade-in">
         {/* KPI row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard title="Expected Yield" value="8.75 T" subtext="3.5 acres × 2.5T/acre" icon="🌾" trend="up" trendValue="+12% vs last season" highlight />
-          <StatCard title="Market Price" value="₹28/kg" subtext="Predicted ₹35/kg in 2 weeks" icon="📈" trend="up" trendValue="+25% forecast" />
+          <StatCard title="Expected Yield" value={expectedYield} subtext={`${farmArea} × 2.5T/acre`} icon="🌾" trend="up" trendValue="+12% vs last season" highlight />
+          <StatCard title="Market Price" value="₹28/kg" subtext={`${primaryCrop} · Predicted ₹35/kg in 2 weeks`} icon="📈" trend="up" trendValue="+25% forecast" />
           <StatCard title="Demand Forecast" value="HIGH" subtext="Hyderabad, Bangalore markets" icon="🔥" trend="up" trendValue="Festival season demand" />
           <StatCard title="Days to Harvest" value="7 days" subtext="Oct 15, 2024" icon="📅" />
         </div>
