@@ -1,8 +1,7 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { X, Mic, MicOff, Send, Loader2, Volume2, VolumeX } from "lucide-react";
+import { X, Mic, MicOff, Send, Loader2, Volume2, VolumeX, StopCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 type Language = "en" | "te" | "hi";
@@ -10,6 +9,7 @@ type Message = { role: "user" | "assistant"; content: string };
 
 const LANG_LABELS: Record<Language, string> = { en: "EN", te: "తె", hi: "हि" };
 const LANG_NAMES: Record<Language, string> = { en: "English", te: "Telugu", hi: "Hindi" };
+const LANG_BCP47: Record<Language, string> = { en: "en-IN", te: "te-IN", hi: "hi-IN" };
 
 const QUICK_PROMPTS: Record<Language, string[]> = {
   en: ["Best time to sell tomatoes?", "Transport rates Hyderabad?", "Should I store or sell now?"],
@@ -17,82 +17,71 @@ const QUICK_PROMPTS: Record<Language, string[]> = {
   hi: ["टमाटर कब बेचें?", "भाड़ा दर क्या है?", "अभी बेचें या रखें?"],
 };
 
-// Browser Web Speech API fallback
-const LANG_BCP47: Record<string, string> = { te: "te-IN", hi: "hi-IN", en: "en-IN" };
+// ─── Browser TTS ────────────────────────────────────────────────────────────
 
-// Returns the best available SpeechSynthesisVoice for a BCP-47 lang tag, or null
-function findVoice(bcp47: string): SpeechSynthesisVoice | null {
+function cleanText(text: string): string {
+  return text
+    .replace(/[*_`#~>]/g, "")
+    .replace(/\n+/g, ". ")
+    .replace(/[\u{1F000}-\u{1FFFF}]/gu, "") // strip emoji
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    .slice(0, 3000);
+}
+
+function getBestVoice(bcp47: string): SpeechSynthesisVoice | null {
   const voices = window.speechSynthesis?.getVoices() ?? [];
-  // Exact match first, then prefix match (e.g. "te" in "te-IN")
+  const prefix = bcp47.split("-")[0];
   return (
     voices.find((v) => v.lang === bcp47) ||
-    voices.find((v) => v.lang.startsWith(bcp47.split("-")[0])) ||
+    voices.find((v) => v.lang.startsWith(prefix)) ||
     null
   );
 }
 
-function speakWithBrowser(
+/**
+ * Speak text using the browser Web Speech API.
+ * For Telugu/Hindi: tries native voice first; if unavailable, falls back
+ * to English voice so the user hears something useful (transliterated).
+ */
+function speakText(
   text: string,
-  lang: string,
+  lang: Language,
   onStart: () => void,
   onEnd: () => void,
-  onNoVoice: () => void,
-): SpeechSynthesisUtterance | null {
-  if (!window.speechSynthesis) { onEnd(); return null; }
+): void {
+  if (!window.speechSynthesis) { onEnd(); return; }
   window.speechSynthesis.cancel();
 
-  const bcp47 = LANG_BCP47[lang] ?? "en-IN";
+  const bcp47 = LANG_BCP47[lang];
 
   const doSpeak = () => {
-    const voice = findVoice(bcp47);
-    if (!voice && lang !== "en") {
-      // No native voice for this script — don't garble numbers/symbols
-      onNoVoice();
-      return null;
-    }
-    // Strip markdown, emoji and keep only printable chars the voice can handle
-    const clean = text
-      .replace(/[*_`#~>]/g, "")
-      .replace(/\n+/g, ". ")
-      // Remove emoji (broad Unicode ranges)
-      .replace(/[\u{1F300}-\u{1FFFF}]/gu, "")
-      .replace(/\s{2,}/g, " ")
-      .trim()
-      .slice(0, 3000);
-    const utt = new SpeechSynthesisUtterance(clean);
-    utt.lang = bcp47;
+    const voice = getBestVoice(bcp47) ?? getBestVoice("en-IN") ?? null;
+    const utt = new SpeechSynthesisUtterance(cleanText(text));
+    utt.lang = voice?.lang ?? bcp47;
+    utt.rate = 1;
+    utt.pitch = 1;
+    utt.volume = 1;
     if (voice) utt.voice = voice;
-    utt.rate = 0.9;
     utt.onstart = onStart;
     utt.onend = onEnd;
     utt.onerror = () => onEnd();
     window.speechSynthesis.speak(utt);
-    return utt;
   };
 
-  // Voices may not be loaded yet on first call
+  // Voices may not be loaded yet on first render
   if (window.speechSynthesis.getVoices().length === 0) {
     window.speechSynthesis.onvoiceschanged = () => {
       window.speechSynthesis.onvoiceschanged = null;
       doSpeak();
     };
-    return null;
+  } else {
+    doSpeak();
   }
-  return doSpeak() ?? null;
 }
 
-// Use browser Web Speech API directly (ElevenLabs Free Tier is restricted)
-function playTTS(
-  text: string,
-  lang: string,
-  onStart: () => void,
-  onEnd: () => void,
-  onNoVoice: () => void,
-): void {
-  speakWithBrowser(text, lang, onStart, onEnd, onNoVoice);
-}
+// ─── AI Streaming ────────────────────────────────────────────────────────────
 
-// Stream SSE response from edge function
 async function streamCopilot({
   messages,
   language,
@@ -157,6 +146,8 @@ async function streamCopilot({
   }
 }
 
+// ─── Component ───────────────────────────────────────────────────────────────
+
 export function AICopilot() {
   const [open, setOpen] = useState(false);
   const [lang, setLang] = useState<Language>("en");
@@ -165,7 +156,6 @@ export function AICopilot() {
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
   const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
-  const [ttsLoading, setTtsLoading] = useState(false);
   const [autoRead, setAutoRead] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -184,6 +174,7 @@ export function AICopilot() {
       };
       setMessages([{ role: "assistant", content: greetings[lang] }]);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   // Re-greet on language change
@@ -196,6 +187,7 @@ export function AICopilot() {
       };
       setMessages((prev) => [...prev, { role: "assistant", content: greetings[lang] }]);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lang]);
 
   // Auto-scroll
@@ -204,6 +196,30 @@ export function AICopilot() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // Stop speech when panel closes
+  useEffect(() => {
+    if (!open) {
+      window.speechSynthesis?.cancel();
+      setSpeakingIdx(null);
+    }
+  }, [open]);
+
+  const speak = useCallback((text: string, idx: number) => {
+    if (speakingIdx === idx) {
+      window.speechSynthesis?.cancel();
+      setSpeakingIdx(null);
+      return;
+    }
+    window.speechSynthesis?.cancel();
+    speakText(
+      text,
+      lang,
+      () => setSpeakingIdx(idx),
+      () => setSpeakingIdx(null),
+    );
+    setSpeakingIdx(idx);
+  }, [speakingIdx, lang]);
 
   const sendMessage = async (text?: string) => {
     const userText = (text || input).trim();
@@ -236,8 +252,7 @@ export function AICopilot() {
       onDone: () => {
         setLoading(false);
         if (autoRead && assistantText) {
-          // slight delay so state settles
-          setTimeout(() => speak(assistantText, finalIdx), 100);
+          setTimeout(() => speak(assistantText, finalIdx), 150);
         }
       },
       onError: (err) => {
@@ -245,38 +260,6 @@ export function AICopilot() {
         toast({ variant: "destructive", title: "AI Error", description: err });
       },
     });
-  };
-
-  const speak = (text: string, idx: number) => {
-    // Stop if already speaking this message
-    if (speakingIdx === idx) {
-      window.speechSynthesis?.cancel();
-      setSpeakingIdx(null);
-      setTtsLoading(false);
-      return;
-    }
-    // Stop any currently playing
-    window.speechSynthesis?.cancel();
-    setSpeakingIdx(null);
-
-    setSpeakingIdx(idx);
-    playTTS(
-      text,
-      lang,
-      () => { setSpeakingIdx(idx); },
-      () => { setSpeakingIdx(null); setTtsLoading(false); },
-      () => {
-        setSpeakingIdx(null);
-        setTtsLoading(false);
-        toast({
-          title: lang === "te" ? "Telugu voice unavailable" : "Hindi voice unavailable",
-          description: lang === "te"
-            ? "Your device doesn't have a Telugu voice installed. Install a Telugu TTS voice in your system settings to hear responses in Telugu."
-            : "Your device doesn't have a Hindi voice installed. Install a Hindi TTS voice in your system settings to hear responses in Hindi.",
-          duration: 5000,
-        });
-      },
-    );
   };
 
   const toggleVoice = () => {
@@ -302,7 +285,7 @@ export function AICopilot() {
     }
 
     const rec = new SR();
-    rec.lang = lang === "te" ? "te-IN" : lang === "hi" ? "hi-IN" : "en-IN";
+    rec.lang = LANG_BCP47[lang];
     rec.interimResults = false;
     rec.onresult = (e) => {
       const transcript = e.results[0][0].transcript;
@@ -333,7 +316,7 @@ export function AICopilot() {
         <div className="fixed bottom-24 right-6 z-50 w-96 max-w-[calc(100vw-2rem)] bg-card rounded-2xl shadow-2xl border border-primary/20 flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
           {/* Header */}
           <div className="bg-gradient-to-r from-primary to-primary/80 px-4 py-3 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-full bg-primary-foreground/20 flex items-center justify-center text-lg flex-shrink-0">🤖</div>
+            <div className="w-9 h-9 rounded-full bg-primary-foreground/20 flex items-center justify-center text-lg flex-shrink-0">🤖</div>
             <div className="flex-1 min-w-0">
               <div className="text-primary-foreground font-semibold text-sm leading-tight">AgroSense Copilot</div>
               <div className="text-primary-foreground/70 text-[10px]">AI · Sell Time · Transport · Storage</div>
@@ -371,7 +354,7 @@ export function AICopilot() {
               variant="ghost"
               size="icon"
               className="h-7 w-7 text-primary-foreground hover:bg-primary/60 flex-shrink-0"
-              onClick={() => { window.speechSynthesis?.cancel(); setSpeakingIdx(null); setTtsLoading(false); setOpen(false); }}
+              onClick={() => setOpen(false)}
             >
               <X className="w-4 h-4" />
             </Button>
@@ -396,20 +379,15 @@ export function AICopilot() {
                   {msg.role === "assistant" && (
                     <button
                       onClick={() => speak(msg.content, i)}
-                      disabled={ttsLoading && speakingIdx !== i}
-                      title={speakingIdx === i ? "Stop reading" : "Read aloud (ElevenLabs AI voice)"}
-                      className={`mt-1.5 flex items-center gap-1 text-[10px] transition-colors disabled:opacity-40 ${
+                      title={speakingIdx === i ? "Stop reading" : "Read aloud"}
+                      className={`mt-1.5 flex items-center gap-1 text-[10px] transition-colors ${
                         speakingIdx === i
                           ? "text-primary font-medium"
-                          : ttsLoading && speakingIdx === null
-                          ? "text-muted-foreground"
                           : "text-muted-foreground hover:text-primary"
                       }`}
                     >
-                      {ttsLoading && speakingIdx === null && i === messages.length - 1
-                        ? <><Loader2 className="w-3 h-3 animate-spin" /> Loading voice…</>
-                        : speakingIdx === i
-                        ? <><VolumeX className="w-3 h-3" /> Stop</>
+                      {speakingIdx === i
+                        ? <><StopCircle className="w-3 h-3" /> Stop</>
                         : <><Volume2 className="w-3 h-3" /> Read aloud</>
                       }
                     </button>
@@ -478,7 +456,7 @@ export function AICopilot() {
           </div>
 
           <div className="px-3 pb-2 text-center">
-            <span className="text-[9px] text-muted-foreground">Powered by Lovable AI · gemini-3-flash-preview</span>
+            <span className="text-[9px] text-muted-foreground">Powered by Lovable AI · Browser Voice</span>
           </div>
         </div>
       )}
