@@ -38,46 +38,14 @@ function speakWithBrowser(
   return utt;
 }
 
-// Play audio from ElevenLabs TTS edge function — falls back to browser TTS on error
-async function playElevenLabsTTS(
+// Use browser Web Speech API directly (ElevenLabs Free Tier is restricted)
+function playTTS(
   text: string,
   lang: string,
-  supabaseUrl: string,
-  publishableKey: string,
   onStart: () => void,
   onEnd: () => void,
-  onBrowserFallback: (utt: SpeechSynthesisUtterance) => void
-): Promise<HTMLAudioElement | null> {
-  onStart();
-  try {
-    const resp = await fetch(`${supabaseUrl}/functions/v1/elevenlabs-tts`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: publishableKey,
-        Authorization: `Bearer ${publishableKey}`,
-      },
-      body: JSON.stringify({ text }),
-    });
-
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      throw new Error(err.error || `TTS error ${resp.status}`);
-    }
-
-    const blob = await resp.blob();
-    const url = URL.createObjectURL(blob);
-    const audio = new Audio(url);
-    audio.onended = () => { URL.revokeObjectURL(url); onEnd(); };
-    audio.onerror = () => { URL.revokeObjectURL(url); onEnd(); };
-    await audio.play();
-    return audio;
-  } catch {
-    // Silently fall back to browser TTS
-    const utt = speakWithBrowser(text, lang, () => {}, onEnd, onEnd);
-    if (utt) onBrowserFallback(utt);
-    return null;
-  }
+): void {
+  speakWithBrowser(text, lang, onStart, onEnd, onEnd);
 }
 
 // Stream SSE response from edge function
