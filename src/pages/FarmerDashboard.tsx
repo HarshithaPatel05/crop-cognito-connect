@@ -650,8 +650,58 @@ export default function FarmerDashboard() {
                   <Button size="sm" className="bg-primary text-xs h-8" onClick={() => setActiveTab("findtransport")}>
                     + Find &amp; Book Vehicle
                   </Button>
-
                 </div>
+
+                {/* ── Pickup Conflict Alerts ── */}
+                {pickupConflicts
+                  .filter(conflict =>
+                    conflict.farmerNames.includes(farmerName) &&
+                    conflict.bookingIds.some(id => myTransportBookings.find(b => b.id === id))
+                  )
+                  .map(conflict => {
+                    const vehicle = AVAILABLE_VEHICLES.find(v => v.id === conflict.vehicleId);
+                    const otherFarmers = conflict.farmerNames.filter(n => n !== farmerName);
+                    return (
+                      <Card key={`conflict-${conflict.vehicleId}-${conflict.date}-${conflict.time}`}
+                        className="border-2 border-yellow-500/60 bg-yellow-500/5">
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-3">
+                            <span className="text-2xl">⚠️</span>
+                            <div className="flex-1 space-y-1">
+                              <div className="font-semibold text-sm text-foreground">
+                                Shared Pickup Schedule Notice
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                <span className="font-medium text-foreground">{vehicle?.ownerName ?? "The transport owner"}</span>
+                                {" "}({vehicle?.vehicleNo}) has scheduled your pickup along with{" "}
+                                <span className="font-medium text-foreground">{otherFarmers.join(", ")}</span>
+                                {" "}on the same trip.
+                              </p>
+                              <div className="flex items-center gap-3 mt-2 flex-wrap">
+                                <span className="inline-flex items-center gap-1.5 bg-yellow-500/10 border border-yellow-500/30 text-yellow-700 dark:text-yellow-400 rounded-full px-3 py-1 text-xs font-semibold">
+                                  📅 {conflict.date}
+                                </span>
+                                <span className="inline-flex items-center gap-1.5 bg-yellow-500/10 border border-yellow-500/30 text-yellow-700 dark:text-yellow-400 rounded-full px-3 py-1 text-xs font-semibold">
+                                  🕐 Pickup at {conflict.time}
+                                </span>
+                                {vehicle && (
+                                  <span className="inline-flex items-center gap-1.5 bg-muted text-muted-foreground rounded-full px-3 py-1 text-xs">
+                                    🚛 {vehicle.vehicleType}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Please be ready at <span className="font-semibold">{b_pickupFor(conflict, myTransportBookings) ?? conflict.time}</span>{" "}
+                                — the vehicle will service multiple pickups on this route. Contact{" "}
+                                {vehicle ? <span className="font-medium text-foreground">{vehicle.ownerName} ({vehicle.phone})</span> : "the owner"} for any queries.
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })
+                }
 
                 {myTransportBookings.length === 0 && (
                   <Card className="border-dashed border-border">
@@ -673,6 +723,9 @@ export default function FarmerDashboard() {
                   const vehicleInfo = b.targetVehicleId
                     ? AVAILABLE_VEHICLES.find(v => v.id === b.targetVehicleId)
                     : null;
+                  const confirmedTime = b.confirmedPickupTime ?? b.time;
+                  // Is this booking part of a conflict?
+                  const conflict = pickupConflicts.find(c => c.bookingIds.includes(b.id));
 
                   return (
                     <Card key={b.id} className={`border-2 transition-all ${
@@ -695,8 +748,13 @@ export default function FarmerDashboard() {
                             {!b.targetVehicleId && (
                               <Badge variant="outline" className="text-[10px] text-muted-foreground">📡 Broadcast</Badge>
                             )}
+                            {conflict && (
+                              <Badge className="text-[10px] bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border border-yellow-500/40">
+                                ⚠️ Shared Trip
+                              </Badge>
+                            )}
                           </div>
-                          <span className="text-xs text-muted-foreground">{b.date} · {b.time}</span>
+                          <span className="text-xs text-muted-foreground">{b.date} · {confirmedTime}</span>
                         </div>
 
                         {isConfirmed && (
@@ -732,6 +790,11 @@ export default function FarmerDashboard() {
                             <span>·</span>
                             <span>📞 {vehicleInfo.phone}</span>
                           </div>
+                        )}
+
+                        {/* ── Live Vehicle Tracker (confirmed bookings only) ── */}
+                        {isConfirmed && vehicleInfo && (
+                          <VehicleTracker booking={b} vehicle={vehicleInfo} />
                         )}
 
                         {isCounter && b.counterNote && (
