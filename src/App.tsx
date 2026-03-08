@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { RoleProvider } from "@/context/RoleContext";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 import FarmerDashboard from "./pages/FarmerDashboard";
 import Marketplace from "./pages/Marketplace";
 import TransportDashboard from "./pages/TransportDashboard";
@@ -29,6 +30,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
             <Route path="/farmer" element={<FarmerDashboard />} />
             <Route path="/marketplace" element={<Marketplace />} />
             <Route path="/transport" element={<TransportDashboard />} />
