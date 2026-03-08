@@ -126,11 +126,9 @@ export function AICopilot() {
   const scrollRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const { toast } = useToast();
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-  const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 
   // Greeting on open
   useEffect(() => {
