@@ -108,13 +108,14 @@ export default function FarmerDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [smsCmd, setSmsCmd] = useState("");
 
-  const [farmData, setFarmData] = useState({
-    name: "Ramesh Kumar", village: "Warangal", crop: "Tomato", variety: "Hybrid F1",
-    area: "3.5", sowingDate: "2024-07-15", harvestDate: "2024-10-15",
+  const [farmData] = useState({
+    name: farmerName, village: farmerLocation.split(",")[0].trim(),
+    crop: primaryCrop, variety: "Hybrid F1",
+    area: fp.farmArea ?? "3.5", sowingDate: "2024-07-15", harvestDate: "2024-10-15",
   });
 
-  const myTransportBookings = bookings.filter(b => b.farmerName === "Ramesh Kumar");
-  const myStorageBookings = storageBookings.filter(b => b.farmerName === "Ramesh Kumar");
+  const myTransportBookings = bookings.filter(b => b.farmerName === farmerName);
+  const myStorageBookings = storageBookings.filter(b => b.farmerName === farmerName);
 
   const pendingCounter = myTransportBookings.filter(b => b.status === "counter-sent").length;
   const pendingStorage = myStorageBookings.filter(b => b.status === "pending").length;
