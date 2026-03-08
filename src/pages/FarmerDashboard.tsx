@@ -195,7 +195,7 @@ function VehicleCard({
 export default function FarmerDashboard() {
   const { toast } = useToast();
   const { user } = useRole();
-  const { bookings, addBooking, farmerAccept, farmerReject } = useTransportBooking();
+  const { bookings, addBooking, addBroadcastBookings, farmerAccept, farmerReject } = useTransportBooking();
   const { bookings: storageBookings, addBooking: addStorageBooking } = useStorageBooking();
 
   const fp = (user?.profile ?? {}) as FarmerProfile;
@@ -221,6 +221,18 @@ export default function FarmerDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [smsCmd, setSmsCmd] = useState("");
 
+  // ── Find Transport state ────────────────────────────────────────────────────
+  // null = no dialog, "targeted" = booking one vehicle, "broadcast" = broadcasting to all selected
+  const [vehicleBookingMode, setVehicleBookingMode] = useState<null | "targeted" | "broadcast">(null);
+  const [targetVehicle, setTargetVehicle] = useState<AvailableVehicle | null>(null);
+  const [selectedVehicleIds, setSelectedVehicleIds] = useState<string[]>([]);
+  const [vehicleFilter, setVehicleFilter] = useState<"all" | "refrigerated" | "available">("all");
+  const [vehicleForm, setVehicleForm] = useState<TransportForm>({
+    ...EMPTY_TRANSPORT,
+    product: primaryCrop,
+    pickupLocation: farmerLocation.split(",")[0].trim(),
+  });
+
   const [farmData] = useState({
     name: farmerName, village: farmerLocation.split(",")[0].trim(),
     crop: primaryCrop, variety: "Hybrid F1",
@@ -232,13 +244,15 @@ export default function FarmerDashboard() {
 
   const pendingCounter = myTransportBookings.filter(b => b.status === "counter-sent").length;
   const pendingStorage = myStorageBookings.filter(b => b.status === "pending").length;
-  const totalBadges = pendingCounter + pendingStorage;
 
   const setTF = (key: keyof TransportForm, val: string) =>
     setTransportForm(p => ({ ...p, [key]: val }));
 
   const setSF = (key: keyof StorageForm, val: string) =>
     setStorageForm(p => ({ ...p, [key]: val }));
+
+  const setVF = (key: keyof TransportForm, val: string) =>
+    setVehicleForm(p => ({ ...p, [key]: val }));
 
   // ── Derived storage form calculations ──────────────────────────────────────
   const selectedUnit = STORAGE_UNITS.find(u => String(u.id) === storageForm.unitId);
@@ -250,6 +264,15 @@ export default function FarmerDashboard() {
     ? Math.round(Number(storageForm.weightKg) * selectedUnit.price * durationMonths)
     : 0;
 
+  // ── Filtered vehicles ───────────────────────────────────────────────────────
+  const filteredVehicles = useMemo(() => {
+    return AVAILABLE_VEHICLES.filter(v => {
+      if (vehicleFilter === "refrigerated") return v.isRefrigerated;
+      if (vehicleFilter === "available") return (v.capacityTon - v.currentLoadTon) > 0.5;
+      return true;
+    });
+  }, [vehicleFilter]);
+
   const handleSMS = () => {
     if (!smsCmd.trim()) return;
     toast({ title: "SMS Command Processed ✅", description: `Data updated from: "${smsCmd}"` });
@@ -257,9 +280,82 @@ export default function FarmerDashboard() {
   };
 
   const handleAction = (label: string) => {
-    if (label === "Request Transport") { setShowTransportDialog(true); return; }
+    if (label === "Find Transport") { setActiveTab("findtransport"); return; }
     if (label === "Book Storage") { setShowStorageDialog(true); return; }
     toast({ title: label, description: "Feature initiated successfully" });
+  };
+
+  const handleToggleVehicleSelect = (id: string) => {
+    setSelectedVehicleIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleOpenTargeted = (v: AvailableVehicle) => {
+    setTargetVehicle(v);
+    setVehicleForm({ ...EMPTY_TRANSPORT, product: primaryCrop, pickupLocation: farmData.village, phone: user?.phone ?? "" });
+    setVehicleBookingMode("targeted");
+  };
+
+  const handleOpenBroadcast = (v?: AvailableVehicle) => {
+    // If triggered from a specific vehicle card, pre-select it
+    if (v && !selectedVehicleIds.includes(v.id)) {
+      setSelectedVehicleIds(prev => [...prev, v.id]);
+    }
+    setVehicleForm({ ...EMPTY_TRANSPORT, product: primaryCrop, pickupLocation: farmData.village, phone: user?.phone ?? "" });
+    setVehicleBookingMode("broadcast");
+  };
+
+  const validateVehicleForm = (form: TransportForm) => {
+    const product = form.product === "Other" ? form.customProduct : form.product;
+    if (!product || !form.weightKg || !form.pickupLocation || !form.dropLocation || !form.date || !form.time || !form.offeredPrice || !form.phone) {
+      toast({ title: "Please fill all required fields", variant: "destructive" });
+      return false;
+    }
+    return true;
+  };
+
+  const handleSubmitTargetedVehicle = () => {
+    if (!targetVehicle || !validateVehicleForm(vehicleForm)) return;
+    const product = vehicleForm.product === "Other" ? vehicleForm.customProduct : vehicleForm.product;
+    addBooking({
+      farmerName, farmerPhone: vehicleForm.phone,
+      product, weightKg: Number(vehicleForm.weightKg),
+      pickupLocation: vehicleForm.pickupLocation, dropLocation: vehicleForm.dropLocation,
+      date: vehicleForm.date, time: vehicleForm.time,
+      offeredPrice: Number(vehicleForm.offeredPrice), notes: vehicleForm.notes,
+      targetVehicleId: targetVehicle.id,
+    });
+    toast({
+      title: `🚚 Request Sent to ${targetVehicle.ownerName}!`,
+      description: `Booking request submitted. You'll be notified when they respond.`,
+    });
+    setVehicleBookingMode(null);
+    setTargetVehicle(null);
+    setActiveTab("transport");
+  };
+
+  const handleSubmitBroadcast = () => {
+    if (!validateVehicleForm(vehicleForm)) return;
+    const ids = selectedVehicleIds.length > 0 ? selectedVehicleIds : AVAILABLE_VEHICLES.map(v => v.id);
+    const product = vehicleForm.product === "Other" ? vehicleForm.customProduct : vehicleForm.product;
+    addBroadcastBookings(
+      {
+        farmerName, farmerPhone: vehicleForm.phone,
+        product, weightKg: Number(vehicleForm.weightKg),
+        pickupLocation: vehicleForm.pickupLocation, dropLocation: vehicleForm.dropLocation,
+        date: vehicleForm.date, time: vehicleForm.time,
+        offeredPrice: Number(vehicleForm.offeredPrice), notes: vehicleForm.notes,
+      },
+      ids
+    );
+    toast({
+      title: `📡 Broadcast Sent to ${ids.length} Vehicle${ids.length > 1 ? "s" : ""}!`,
+      description: "You'll be notified as each owner responds. First to accept wins the trip.",
+    });
+    setVehicleBookingMode(null);
+    setSelectedVehicleIds([]);
+    setActiveTab("transport");
   };
 
   const handleSubmitTransport = () => {
