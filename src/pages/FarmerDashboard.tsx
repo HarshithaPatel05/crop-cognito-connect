@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,11 +17,14 @@ import { SpoilageRiskMeter } from "@/components/shared/SpoilageRiskMeter";
 import { StatCard } from "@/components/shared/StatCard";
 import { AICopilot } from "@/components/shared/AICopilot";
 import { StarRating } from "@/components/shared/StarRating";
+import { RatingBadge } from "@/components/shared/RatingBadge";
+import { RatingPromptDialog } from "@/components/shared/RatingPromptDialog";
 import { AI_RECOMMENDATIONS, STORAGE_UNITS } from "@/data/mockData";
 import { useToast } from "@/hooks/use-toast";
 import { useTransportBooking, AVAILABLE_VEHICLES, AvailableVehicle } from "@/context/TransportBookingContext";
 import { useStorageBooking, StorageType } from "@/context/StorageBookingContext";
 import { useRole, FarmerProfile } from "@/context/RoleContext";
+import { useRating } from "@/context/RatingContext";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, BarChart, Bar, Legend } from "recharts";
 
 const PRICE_HISTORY = [
