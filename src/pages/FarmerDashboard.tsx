@@ -1096,5 +1096,64 @@ export default function FarmerDashboard() {
 
       <VoiceAssistant />
     </AppLayout>
+
+      {/* ── Targeted Vehicle Booking Dialog ── */}
+      <Dialog open={vehicleBookingMode === "targeted"} onOpenChange={(open) => !open && setVehicleBookingMode(null)}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <span>📝</span> Request Vehicle: {targetVehicle?.ownerName}
+            </DialogTitle>
+            {targetVehicle && (
+              <DialogDescription className="text-xs">
+                {targetVehicle.vehicleNo} · {targetVehicle.vehicleType} · {targetVehicle.capacityTon}T capacity
+                {targetVehicle.isRefrigerated ? " · ❄️ Refrigerated" : ""}
+                · <StarRating rating={targetVehicle.rating} size="sm" showValue /> · {targetVehicle.totalTrips} trips
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <VehicleBookingForm form={vehicleForm} setForm={setVF} primaryCrop={primaryCrop} />
+          <DialogFooter className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => setVehicleBookingMode(null)}>Cancel</Button>
+            <Button size="sm" className="bg-primary" onClick={handleSubmitTargetedVehicle}>
+              📤 Send Request to {targetVehicle?.ownerName}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Broadcast Booking Dialog ── */}
+      <Dialog open={vehicleBookingMode === "broadcast"} onOpenChange={(open) => !open && setVehicleBookingMode(null)}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <span>📡</span> Broadcast Request
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              {selectedVehicleIds.length > 0
+                ? `Your request will be sent to ${selectedVehicleIds.length} selected vehicle${selectedVehicleIds.length > 1 ? "s" : ""}. The first to accept confirms the trip.`
+                : `Your request will be broadcast to all ${AVAILABLE_VEHICLES.length} available vehicles.`}
+            </DialogDescription>
+          </DialogHeader>
+          {/* Vehicle list preview */}
+          <div className="flex flex-wrap gap-1 pb-2 border-b border-border">
+            {(selectedVehicleIds.length > 0 ? selectedVehicleIds : AVAILABLE_VEHICLES.map(v => v.id)).map(id => {
+              const v = AVAILABLE_VEHICLES.find(x => x.id === id);
+              return v ? (
+                <span key={id} className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground">🚛 {v.ownerName}</span>
+              ) : null;
+            })}
+          </div>
+          <VehicleBookingForm form={vehicleForm} setForm={setVF} primaryCrop={primaryCrop} />
+          <DialogFooter className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => setVehicleBookingMode(null)}>Cancel</Button>
+            <Button size="sm" className="bg-primary" onClick={handleSubmitBroadcast}>
+              📡 Broadcast to {selectedVehicleIds.length > 0 ? selectedVehicleIds.length : AVAILABLE_VEHICLES.length} Vehicles
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+    </AppLayout>
   );
 }
