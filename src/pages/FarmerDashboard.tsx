@@ -1,10 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -21,12 +22,67 @@ import { useToast } from "@/hooks/use-toast";
 import { useTransportBooking, AVAILABLE_VEHICLES, AvailableVehicle } from "@/context/TransportBookingContext";
 import { useStorageBooking, StorageType } from "@/context/StorageBookingContext";
 import { useRole, FarmerProfile } from "@/context/RoleContext";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, BarChart, Bar, Legend } from "recharts";
 
 const PRICE_HISTORY = [
   { day: "Sep 20", price: 22 }, { day: "Sep 25", price: 24 }, { day: "Oct 1", price: 26 },
   { day: "Oct 5", price: 25 }, { day: "Oct 10", price: 28 }, { day: "Oct 15", price: 32 },
 ];
+
+// ── Market trends & AI prediction data ───────────────────────────────────────
+const PRICE_TREND_12W = [
+  { week: "W1 Aug", tomato: 18, onion: 14, chilli: 32, rice: 22 },
+  { week: "W2 Aug", tomato: 20, onion: 15, chilli: 34, rice: 22 },
+  { week: "W3 Aug", tomato: 19, onion: 16, chilli: 33, rice: 23 },
+  { week: "W4 Aug", tomato: 21, onion: 17, chilli: 36, rice: 23 },
+  { week: "W1 Sep", tomato: 23, onion: 18, chilli: 38, rice: 24 },
+  { week: "W2 Sep", tomato: 25, onion: 19, chilli: 37, rice: 24 },
+  { week: "W3 Sep", tomato: 26, onion: 21, chilli: 39, rice: 24 },
+  { week: "W4 Sep", tomato: 28, onion: 22, chilli: 41, rice: 25 },
+  { week: "W1 Oct", tomato: 30, onion: 24, chilli: 43, rice: 25 },
+  { week: "W2 Oct", tomato: 29, onion: 25, chilli: 42, rice: 26 },
+  { week: "W3 Oct", tomato: 32, onion: 26, chilli: 44, rice: 26 },
+  { week: "W4 Oct", tomato: 35, onion: 27, chilli: 47, rice: 27 },
+];
+
+const BUYER_DEMAND = [
+  { market: "Hyd Rythu Bazar", demand: 92, buyers: 28, avgQty: 12 },
+  { market: "Secunderabad", demand: 84, buyers: 21, avgQty: 9 },
+  { market: "Warangal Local", demand: 61, buyers: 14, avgQty: 7 },
+  { market: "Karimnagar APMC", demand: 78, buyers: 18, avgQty: 10 },
+  { market: "Nizamabad Hub", demand: 69, buyers: 16, avgQty: 8 },
+];
+
+const AI_PREDICTIONS = [
+  { crop: "Tomato",   currentPrice: 32, predictedHigh: 42, predictedLow: 28, confidence: 87, bestWindow: "Oct 20–25", signal: "SELL NOW" },
+  { crop: "Onion",    currentPrice: 27, predictedHigh: 35, predictedLow: 24, confidence: 81, bestWindow: "Nov 1–7",   signal: "HOLD" },
+  { crop: "Chilli",   currentPrice: 44, predictedHigh: 52, predictedLow: 40, confidence: 76, bestWindow: "Oct 28–Nov 3", signal: "HOLD" },
+  { crop: "Turmeric", currentPrice: 88, predictedHigh: 96, predictedLow: 82, confidence: 72, bestWindow: "Nov 5–12", signal: "HOLD" },
+];
+
+// ── Nearby farmers mock data ──────────────────────────────────────────────────
+interface NearbyFarmer {
+  id: string; name: string; village: string;
+  lat: number; lng: number;
+  crop: string; area: string;
+  harvestDate: string; phone: string;
+  rating: number; tradeGroup?: string;
+}
+
+const NEARBY_FARMERS: NearbyFarmer[] = [
+  { id: "F1", name: "Prakash Rao",   village: "Hanamkonda", lat: 18.0031, lng: 79.5540, crop: "Tomato",   area: "4.2 ac", harvestDate: "Oct 18", phone: "98765 11223", rating: 4.5, tradeGroup: "Tomato Growers Cluster" },
+  { id: "F2", name: "Anand Reddy",   village: "Kazipet",    lat: 17.9524, lng: 79.5100, crop: "Tomato",   area: "2.8 ac", harvestDate: "Oct 20", phone: "97654 22334", rating: 4.2, tradeGroup: "Tomato Growers Cluster" },
+  { id: "F3", name: "Laxmi Devi",    village: "Narsampet",  lat: 17.9260, lng: 79.8960, crop: "Onion",    area: "3.5 ac", harvestDate: "Nov 5",  phone: "96543 33445", rating: 4.7 },
+  { id: "F4", name: "Raju Nair",     village: "Parkal",     lat: 18.1980, lng: 79.7150, crop: "Chilli",   area: "5.0 ac", harvestDate: "Oct 28", phone: "95432 44556", rating: 4.3 },
+  { id: "F5", name: "Meena Bai",     village: "Bhupalpally",lat: 18.4390, lng: 79.9780, crop: "Turmeric", area: "6.1 ac", harvestDate: "Dec 10", phone: "94321 55667", rating: 4.8 },
+  { id: "F6", name: "Gopi Krishna",  village: "Mahabubabad",lat: 17.5990, lng: 80.0040, crop: "Rice",     area: "7.3 ac", harvestDate: "Nov 20", phone: "93210 66778", rating: 4.1 },
+  { id: "F7", name: "Sunita Patel",  village: "Kodad",      lat: 17.7000, lng: 79.9500, crop: "Tomato",   area: "2.1 ac", harvestDate: "Oct 22", phone: "92109 77889", rating: 4.4, tradeGroup: "Tomato Growers Cluster" },
+];
+
+const CROP_COLORS_MAP: Record<string, string> = {
+  Tomato: "#ef4444", Onion: "#a78bfa", Chilli: "#f97316",
+  Turmeric: "#eab308", Rice: "#84cc16", Wheat: "#d97706",
+};
 
 const QUICK_ACTIONS = [
   { icon: "📋", label: "List Crop for Sale" },
@@ -334,8 +390,22 @@ export default function FarmerDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [smsCmd, setSmsCmd] = useState("");
 
+  // ── Crop Photos state ───────────────────────────────────────────────────────
+  interface CropPhoto { id: string; url: string; label: string; date: string; note: string; }
+  const [cropPhotos, setCropPhotos] = useState<CropPhoto[]>([
+    { id: "p1", url: "https://images.unsplash.com/photo-1592921870789-04563d55041c?w=400&q=80", label: "Tomato Field", date: "Oct 10", note: "Stage: Fruit Development" },
+    { id: "p2", url: "https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=400&q=80", label: "Ripening Stage", date: "Oct 12", note: "Ready in ~7 days" },
+  ]);
+  const [photoCaption, setPhotoCaption] = useState("");
+  const [photoNote, setPhotoNote] = useState("");
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Nearby farmers state ────────────────────────────────────────────────────
+  const [selectedFarmer, setSelectedFarmer] = useState<NearbyFarmer | null>(null);
+  const [tradeGroupJoined, setTradeGroupJoined] = useState<string[]>([]);
+  const [cropFilter, setCropFilter] = useState<string>("All");
+
   // ── Find Transport state ────────────────────────────────────────────────────
-  // null = no dialog, "targeted" = booking one vehicle, "broadcast" = broadcasting to all selected
   const [vehicleBookingMode, setVehicleBookingMode] = useState<null | "targeted" | "broadcast">(null);
   const [targetVehicle, setTargetVehicle] = useState<AvailableVehicle | null>(null);
   const [selectedVehicleIds, setSelectedVehicleIds] = useState<string[]>([]);
@@ -355,15 +425,16 @@ export default function FarmerDashboard() {
   const myTransportBookings = bookings.filter(b => b.farmerName === farmerName);
   const myStorageBookings = storageBookings.filter(b => b.farmerName === farmerName);
 
+  // ── Notification counts ─────────────────────────────────────────────────────
   const pendingCounter = myTransportBookings.filter(b => b.status === "counter-sent").length;
+  const pendingAccepted = myTransportBookings.filter(b => b.status === "accepted").length;
+  const transportAlerts = pendingCounter + pendingAccepted;
   const pendingStorage = myStorageBookings.filter(b => b.status === "pending").length;
 
   const setTF = (key: keyof TransportForm, val: string) =>
     setTransportForm(p => ({ ...p, [key]: val }));
-
   const setSF = (key: keyof StorageForm, val: string) =>
     setStorageForm(p => ({ ...p, [key]: val }));
-
   const setVF = (key: keyof TransportForm, val: string) =>
     setVehicleForm(p => ({ ...p, [key]: val }));
 
@@ -386,10 +457,32 @@ export default function FarmerDashboard() {
     });
   }, [vehicleFilter]);
 
+  // ── Crop photo upload handler ───────────────────────────────────────────────
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const url = ev.target?.result as string;
+      const now = new Date();
+      setCropPhotos(prev => [{
+        id: `p${Date.now()}`, url,
+        label: photoCaption || `${primaryCrop} Photo`,
+        date: now.toLocaleDateString("en-IN", { day: "numeric", month: "short" }),
+        note: photoNote || "Just uploaded",
+      }, ...prev]);
+      setPhotoCaption(""); setPhotoNote("");
+      toast({ title: "📸 Crop photo uploaded!", description: "Photo added to your gallery." });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
   const handleSMS = () => {
     if (!smsCmd.trim()) return;
     toast({ title: "SMS Command Processed ✅", description: `Data updated from: "${smsCmd}"` });
     setSmsCmd("");
+
   };
 
   const handleAction = (label: string) => {
@@ -578,20 +671,23 @@ export default function FarmerDashboard() {
                 <TabsTrigger value="findtransport">🔍 Find Transport</TabsTrigger>
                 <TabsTrigger value="transport" className="relative">
                   🚚 My Bookings
-                  {pendingCounter > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-accent text-foreground text-[9px] font-bold rounded-full px-1 leading-4 min-w-[16px] text-center">
-                      {pendingCounter}
+                  {transportAlerts > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-[9px] font-bold rounded-full px-1 leading-4 min-w-[16px] text-center animate-pulse">
+                      {transportAlerts}
                     </span>
                   )}
                 </TabsTrigger>
                 <TabsTrigger value="storage" className="relative">
                   🏪 Storage
                   {pendingStorage > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-accent text-foreground text-[9px] font-bold rounded-full px-1 leading-4 min-w-[16px] text-center">
+                    <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-[9px] font-bold rounded-full px-1 leading-4 min-w-[16px] text-center animate-pulse">
                       {pendingStorage}
                     </span>
                   )}
                 </TabsTrigger>
+                <TabsTrigger value="photos">📸 Crop Photos</TabsTrigger>
+                <TabsTrigger value="trends">📊 Market Trends</TabsTrigger>
+                <TabsTrigger value="nearby">🗺️ Nearby Farmers</TabsTrigger>
                 <TabsTrigger value="register">Farm Details</TabsTrigger>
                 <TabsTrigger value="market">Market Intel</TabsTrigger>
               </TabsList>
@@ -1080,6 +1176,346 @@ export default function FarmerDashboard() {
                   ))}
                 </div>
               </TabsContent>
+
+              {/* ══════════════════════════════════════════════════════════
+                  TAB: CROP PHOTOS
+              ══════════════════════════════════════════════════════════ */}
+              <TabsContent value="photos" className="mt-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold">Crop Photo Gallery</h3>
+                    <p className="text-xs text-muted-foreground">Upload field photos for AI analysis &amp; buyer visibility</p>
+                  </div>
+                  <Button size="sm" className="bg-primary text-xs h-8" onClick={() => photoInputRef.current?.click()}>
+                    📸 Add Photo
+                  </Button>
+                  <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+                </div>
+
+                {/* Upload form */}
+                <Card className="border-dashed border-primary/40 bg-primary/3">
+                  <CardContent className="p-4 space-y-3">
+                    <div className="text-xs font-medium text-foreground">Add a new crop photo</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Caption</Label>
+                        <Input className="h-8 text-xs" placeholder="e.g. Week 8 growth" value={photoCaption} onChange={e => setPhotoCaption(e.target.value)} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Note</Label>
+                        <Input className="h-8 text-xs" placeholder="e.g. Pest spotted" value={photoNote} onChange={e => setPhotoNote(e.target.value)} />
+                      </div>
+                    </div>
+                    <Button size="sm" className="w-full bg-primary text-xs h-8" onClick={() => photoInputRef.current?.click()}>
+                      📁 Choose Photo from Device
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Gallery grid */}
+                <div className="grid grid-cols-2 gap-3">
+                  {cropPhotos.map(p => (
+                    <Card key={p.id} className="overflow-hidden border-border group">
+                      <div className="relative">
+                        <img src={p.url} alt={p.label} className="w-full h-36 object-cover group-hover:scale-105 transition-transform duration-200" />
+                        <div className="absolute top-1 right-1">
+                          <button
+                            className="bg-destructive/80 text-destructive-foreground rounded-full w-5 h-5 text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => setCropPhotos(prev => prev.filter(x => x.id !== p.id))}
+                          >✕</button>
+                        </div>
+                      </div>
+                      <CardContent className="p-2 space-y-0.5">
+                        <div className="text-xs font-medium text-foreground truncate">{p.label}</div>
+                        <div className="flex justify-between text-[10px] text-muted-foreground">
+                          <span>{p.date}</span>
+                          <span className="truncate ml-1">{p.note}</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                  {cropPhotos.length === 0 && (
+                    <div className="col-span-2 text-center text-muted-foreground text-sm py-12">
+                      <div className="text-4xl mb-2">📷</div>
+                      <p>No crop photos yet. Upload your first photo!</p>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              {/* ══════════════════════════════════════════════════════════
+                  TAB: MARKET TRENDS & AI PREDICTION
+              ══════════════════════════════════════════════════════════ */}
+              <TabsContent value="trends" className="mt-4 space-y-4">
+                {/* AI Pre-harvest Price Predictions */}
+                <div>
+                  <h3 className="text-sm font-semibold mb-3">🤖 AI Pre-Harvest Price Predictions</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {AI_PREDICTIONS.map(p => (
+                      <Card key={p.crop} className={`border-2 ${p.signal === "SELL NOW" ? "border-primary/40 bg-primary/3" : "border-border"}`}>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-semibold text-sm text-foreground">{p.crop}</span>
+                            <Badge className={`text-[10px] ${p.signal === "SELL NOW" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"}`}>
+                              {p.signal}
+                            </Badge>
+                          </div>
+                          <div className="flex items-end gap-1 mb-2">
+                            <span className="text-2xl font-bold text-primary">₹{p.currentPrice}</span>
+                            <span className="text-xs text-muted-foreground mb-1">/kg now</span>
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Predicted range:</span>
+                              <span className="font-medium text-foreground">₹{p.predictedLow}–₹{p.predictedHigh}/kg</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Best sell window:</span>
+                              <span className="font-medium text-foreground">{p.bestWindow}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-muted-foreground">AI confidence:</span>
+                              <div className="flex items-center gap-1">
+                                <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                                  <div className="h-1.5 bg-primary rounded-full" style={{ width: `${p.confidence}%` }} />
+                                </div>
+                                <span className="font-medium text-primary">{p.confidence}%</span>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 12-week price trend chart */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">12-Week Price Trends (₹/kg)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <LineChart data={PRICE_TREND_12W}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis dataKey="week" tick={{ fontSize: 9 }} interval={2} />
+                        <YAxis tick={{ fontSize: 9 }} unit="₹" />
+                        <Tooltip formatter={(v, n) => [`₹${v}/kg`, n]} />
+                        <Legend wrapperStyle={{ fontSize: 10 }} />
+                        <Line type="monotone" dataKey="tomato" stroke="#ef4444" strokeWidth={2} dot={false} name="Tomato" />
+                        <Line type="monotone" dataKey="onion" stroke="#a78bfa" strokeWidth={2} dot={false} name="Onion" />
+                        <Line type="monotone" dataKey="chilli" stroke="#f97316" strokeWidth={2} dot={false} name="Chilli" />
+                        <Line type="monotone" dataKey="rice" stroke="hsl(var(--primary))" strokeWidth={1.5} dot={false} name="Rice" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+
+                {/* Buyer demand by market */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Buyer Demand by Market</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <BarChart data={BUYER_DEMAND} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis type="number" tick={{ fontSize: 9 }} domain={[0, 100]} unit="%" />
+                        <YAxis dataKey="market" type="category" tick={{ fontSize: 9 }} width={90} />
+                        <Tooltip formatter={(v) => [`${v}%`, "Demand"]} />
+                        <Bar dataKey="demand" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                    <div className="grid grid-cols-3 gap-2 mt-3">
+                      {BUYER_DEMAND.slice(0, 3).map(m => (
+                        <div key={m.market} className="bg-muted/50 rounded-lg p-2 text-center text-xs">
+                          <div className="font-bold text-foreground">{m.buyers}</div>
+                          <div className="text-muted-foreground text-[10px]">Active buyers</div>
+                          <div className="font-medium text-muted-foreground text-[10px] truncate">{m.market}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* ══════════════════════════════════════════════════════════
+                  TAB: NEARBY FARMERS MAP
+              ══════════════════════════════════════════════════════════ */}
+              <TabsContent value="nearby" className="mt-4 space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <h3 className="text-sm font-semibold">Nearby Farmers</h3>
+                    <p className="text-xs text-muted-foreground">Connect, cluster, and trade together</p>
+                  </div>
+                  <div className="flex gap-1 flex-wrap">
+                    {["All", "Tomato", "Onion", "Chilli", "Turmeric", "Rice"].map(c => (
+                      <Button key={c} size="sm" variant={cropFilter === c ? "default" : "outline"}
+                        className={`text-[10px] h-6 px-2 ${cropFilter === c ? "bg-primary" : ""}`}
+                        onClick={() => setCropFilter(c)}>
+                        {c}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Map placeholder (interactive list as fallback) */}
+                <Card className="overflow-hidden border-border">
+                  <div className="bg-muted/40 h-56 relative flex items-center justify-center border-b border-border">
+                    {/* Simulated map background */}
+                    <div className="absolute inset-0 grid grid-cols-8 grid-rows-6 opacity-10">
+                      {Array.from({ length: 48 }).map((_, i) => (
+                        <div key={i} className="border border-primary/40" />
+                      ))}
+                    </div>
+                    {/* Farmer pins */}
+                    {NEARBY_FARMERS
+                      .filter(f => cropFilter === "All" || f.crop === cropFilter)
+                      .map((f, i) => {
+                        const x = 10 + (i * 14) % 80;
+                        const y = 10 + (i * 17) % 70;
+                        const color = CROP_COLORS_MAP[f.crop] || "hsl(var(--primary))";
+                        return (
+                          <button key={f.id}
+                            style={{ left: `${x}%`, top: `${y}%`, borderColor: color }}
+                            className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer group"
+                            onClick={() => setSelectedFarmer(f)}>
+                            <div style={{ backgroundColor: color }}
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-lg border-2 border-white group-hover:scale-125 transition-transform">
+                              {f.name[0]}
+                            </div>
+                            <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-popover border border-border text-foreground text-[9px] px-1.5 py-0.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity shadow-md pointer-events-none">
+                              {f.name} · {f.crop}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    <div className="relative z-10 text-center text-muted-foreground text-xs bg-background/80 px-3 py-1.5 rounded-full border border-border">
+                      🗺️ Warangal District · Click pins to view farmer details
+                    </div>
+                  </div>
+                  <CardContent className="p-3 text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
+                    {Object.entries(CROP_COLORS_MAP).map(([crop, color]) => (
+                      <span key={crop} className="flex items-center gap-1">
+                        <span style={{ backgroundColor: color }} className="w-2.5 h-2.5 rounded-full inline-block" />
+                        {crop}
+                      </span>
+                    ))}
+                  </CardContent>
+                </Card>
+
+                {/* Selected farmer detail */}
+                {selectedFarmer && (
+                  <Card className="border-primary/30 bg-primary/3">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div style={{ backgroundColor: CROP_COLORS_MAP[selectedFarmer.crop] || "hsl(var(--primary))" }}
+                            className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                            {selectedFarmer.name[0]}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-sm text-foreground">{selectedFarmer.name}</div>
+                            <div className="text-xs text-muted-foreground">{selectedFarmer.village}</div>
+                          </div>
+                        </div>
+                        <button className="text-muted-foreground text-xs hover:text-foreground" onClick={() => setSelectedFarmer(null)}>✕</button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div className="bg-muted/50 rounded-lg p-2 text-center">
+                          <div className="font-bold text-foreground">{selectedFarmer.crop}</div>
+                          <div className="text-muted-foreground text-[10px]">Crop</div>
+                        </div>
+                        <div className="bg-muted/50 rounded-lg p-2 text-center">
+                          <div className="font-bold text-foreground">{selectedFarmer.area}</div>
+                          <div className="text-muted-foreground text-[10px]">Farm Area</div>
+                        </div>
+                        <div className="bg-muted/50 rounded-lg p-2 text-center">
+                          <div className="font-bold text-foreground">{selectedFarmer.harvestDate}</div>
+                          <div className="text-muted-foreground text-[10px]">Harvest</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs">
+                        <StarRating rating={selectedFarmer.rating} size="sm" showValue />
+                        <span className="text-muted-foreground">·</span>
+                        <span className="text-muted-foreground">📞 {selectedFarmer.phone}</span>
+                      </div>
+                      {selectedFarmer.tradeGroup && (
+                        <div className="bg-primary/5 border border-primary/20 rounded-lg p-2 text-xs">
+                          🤝 Member of: <span className="font-semibold text-primary">{selectedFarmer.tradeGroup}</span>
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <Button size="sm" className="flex-1 bg-primary text-xs h-7"
+                          onClick={() => toast({ title: `📞 Calling ${selectedFarmer.name}`, description: selectedFarmer.phone })}>
+                          📞 Contact
+                        </Button>
+                        {selectedFarmer.tradeGroup && (
+                          <Button size="sm" variant="outline" className="flex-1 text-xs h-7 border-primary/40 text-primary"
+                            onClick={() => {
+                              const g = selectedFarmer.tradeGroup!;
+                              if (!tradeGroupJoined.includes(g)) {
+                                setTradeGroupJoined(prev => [...prev, g]);
+                                toast({ title: `🤝 Joined ${g}!`, description: "You're now part of this trade cluster." });
+                              }
+                            }}>
+                            {tradeGroupJoined.includes(selectedFarmer.tradeGroup) ? "✅ Joined" : "🤝 Join Cluster"}
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Farmer list */}
+                <div className="space-y-2">
+                  {NEARBY_FARMERS
+                    .filter(f => cropFilter === "All" || f.crop === cropFilter)
+                    .map(f => (
+                      <Card key={f.id}
+                        className={`border cursor-pointer hover:border-primary/40 transition-all ${selectedFarmer?.id === f.id ? "border-primary/50 bg-primary/3" : "border-border"}`}
+                        onClick={() => setSelectedFarmer(f)}>
+                        <CardContent className="p-3 flex items-center gap-3">
+                          <div style={{ backgroundColor: CROP_COLORS_MAP[f.crop] || "hsl(var(--primary))" }}
+                            className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                            {f.name[0]}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-semibold text-foreground">{f.name}</div>
+                            <div className="text-[10px] text-muted-foreground">{f.village} · {f.crop} · {f.area}</div>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className="text-[10px] text-muted-foreground">Harvest: {f.harvestDate}</div>
+                            {f.tradeGroup && (
+                              <Badge className="text-[9px] bg-primary/10 text-primary border border-primary/20 mt-0.5">
+                                🤝 Cluster
+                              </Badge>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                </div>
+
+                {/* Trade clusters summary */}
+                {tradeGroupJoined.length > 0 && (
+                  <Card className="border-primary/30 bg-primary/5">
+                    <CardContent className="p-4">
+                      <div className="text-xs font-semibold text-foreground mb-2">✅ Your Trade Clusters</div>
+                      {tradeGroupJoined.map(g => (
+                        <div key={g} className="flex items-center justify-between text-xs py-1.5 border-b border-border last:border-0">
+                          <span className="text-foreground">🤝 {g}</span>
+                          <Badge className="bg-primary text-primary-foreground text-[9px]">Active</Badge>
+                        </div>
+                      ))}
+                      <p className="text-[10px] text-muted-foreground mt-2">
+                        Clusters enable bulk transport, group negotiation, and joint market listings.
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+
             </Tabs>
           </div>
 
