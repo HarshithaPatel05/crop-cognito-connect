@@ -1032,7 +1032,10 @@ export default function FarmerDashboard() {
                               Owner wants <span className="font-semibold text-foreground">₹{b.counterPrice}</span> (you offered ₹{b.offeredPrice})
                             </p>
                             <Button size="sm" className="bg-primary text-xs h-8"
-                              onClick={() => { farmerAccept(b.id); toast({ title: "✅ Counter accepted! Trip Confirmed 🎉", description: `Confirmed at ₹${b.counterPrice}` }); }}>
+                              onClick={() => {
+                                farmerAccept(b.id);
+                                toast({ title: "✅ Counter accepted! Trip Confirmed 🎉", description: `Confirmed at ₹${b.counterPrice}` });
+                              }}>
                               ✅ Accept ₹{b.counterPrice}
                             </Button>
                             <Button size="sm" variant="outline" className="text-xs h-8 border-destructive/50 text-destructive"
@@ -1047,7 +1050,10 @@ export default function FarmerDashboard() {
                               Owner accepted at your price <span className="font-semibold text-foreground">₹{b.offeredPrice}</span> — confirm to finalise?
                             </p>
                             <Button size="sm" className="bg-primary text-xs h-8"
-                              onClick={() => { farmerAccept(b.id); toast({ title: "🎉 Trip Confirmed!", description: "Both parties agreed — trip is confirmed!" }); }}>
+                              onClick={() => {
+                                farmerAccept(b.id);
+                                toast({ title: "🎉 Trip Confirmed!", description: "Both parties agreed — trip is confirmed!" });
+                              }}>
                               ✅ Confirm Trip
                             </Button>
                             <Button size="sm" variant="outline" className="text-xs h-8 border-destructive/50 text-destructive"
@@ -1056,9 +1062,34 @@ export default function FarmerDashboard() {
                             </Button>
                           </div>
                         )}
-                        {isConfirmed && (
+                        {isConfirmed && vehicleInfo && (
+                          <div className="space-y-2 pt-1 border-t border-primary/20">
+                            <div className="text-xs text-primary font-medium">
+                              ✅ Final price: ₹{b.counterPrice || b.offeredPrice} · {vehicleInfo.ownerName} will contact you at {b.farmerPhone}
+                            </div>
+                            <div className="bg-muted/40 rounded-lg px-3 py-2">
+                              <p className="text-[10px] text-muted-foreground mb-1 font-medium">Farmer Reviews for {vehicleInfo.ownerName}</p>
+                              <RatingBadge targetId={vehicleInfo.id} showReviews />
+                            </div>
+                            <Button size="sm" variant="outline" className="text-xs h-8 border-primary/40 text-primary w-full"
+                              onClick={() => {
+                                addPending({
+                                  bookingId: b.id,
+                                  targetId: vehicleInfo.id,
+                                  targetType: "transport",
+                                  targetName: vehicleInfo.ownerName,
+                                  farmerName: b.farmerName,
+                                  product: b.product,
+                                });
+                                setActiveRatingPrompt(b.id);
+                              }}>
+                              ⭐ Rate this Trip
+                            </Button>
+                          </div>
+                        )}
+                        {isConfirmed && !vehicleInfo && (
                           <div className="text-xs text-primary font-medium pt-1 border-t border-primary/20">
-                            ✅ Final price: ₹{b.counterPrice || b.offeredPrice} · {vehicleInfo ? `${vehicleInfo.ownerName} will contact you at ${b.farmerPhone}` : "Transport owner will contact you soon"}
+                            ✅ Final price: ₹{b.counterPrice || b.offeredPrice} · Transport owner will contact you soon
                           </div>
                         )}
                       </CardContent>
