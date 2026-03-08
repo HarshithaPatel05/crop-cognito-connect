@@ -15,7 +15,7 @@ import { WeatherWidget } from "@/components/shared/WeatherWidget";
 import { HarvestReadinessScore } from "@/components/shared/HarvestReadinessScore";
 import { SpoilageRiskMeter } from "@/components/shared/SpoilageRiskMeter";
 import { StatCard } from "@/components/shared/StatCard";
-import { VoiceAssistant } from "@/components/shared/VoiceAssistant";
+import { AICopilot } from "@/components/shared/AICopilot";
 import { StarRating } from "@/components/shared/StarRating";
 import { AI_RECOMMENDATIONS, STORAGE_UNITS } from "@/data/mockData";
 import { useToast } from "@/hooks/use-toast";
@@ -1706,7 +1706,7 @@ export default function FarmerDashboard() {
         </DialogContent>
       </Dialog>
 
-      <VoiceAssistant />
+      <AICopilot />
 
       {/* ── Targeted Vehicle Booking Dialog ── */}
       <Dialog open={vehicleBookingMode === "targeted"} onOpenChange={(open) => !open && setVehicleBookingMode(null)}>

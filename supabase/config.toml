@@ -1,0 +1,4 @@
+project_id = "kkyuefqovjtbevpampyz"
+
+[functions.farmer-copilot]
+verify_jwt = false
