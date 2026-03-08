@@ -15,9 +15,10 @@ import { HarvestReadinessScore } from "@/components/shared/HarvestReadinessScore
 import { SpoilageRiskMeter } from "@/components/shared/SpoilageRiskMeter";
 import { StatCard } from "@/components/shared/StatCard";
 import { VoiceAssistant } from "@/components/shared/VoiceAssistant";
-import { AI_RECOMMENDATIONS } from "@/data/mockData";
+import { AI_RECOMMENDATIONS, STORAGE_UNITS } from "@/data/mockData";
 import { useToast } from "@/hooks/use-toast";
 import { useTransportBooking } from "@/context/TransportBookingContext";
+import { useStorageBooking, StorageType } from "@/context/StorageBookingContext";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 const PRICE_HISTORY = [
@@ -43,43 +44,79 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
   "farmer-rejected":{ label: "✗ You Declined",      color: "bg-destructive/10 text-destructive border-destructive/30" },
 };
 
+const STORAGE_STATUS_META: Record<string, { label: string; color: string }> = {
+  pending:   { label: "⏳ Awaiting Approval",   color: "bg-muted text-muted-foreground" },
+  approved:  { label: "✅ Approved",             color: "bg-primary/10 text-primary border-primary/30" },
+  rejected:  { label: "❌ Rejected",             color: "bg-destructive/10 text-destructive border-destructive/30" },
+  active:    { label: "🏪 Active",               color: "bg-primary/10 text-primary border-primary/30" },
+  completed: { label: "🎉 Completed",            color: "bg-muted text-foreground" },
+  cancelled: { label: "✗ Cancelled",            color: "bg-destructive/10 text-destructive border-destructive/30" },
+};
+
 const CROPS_LIST = ["Tomato", "Onion", "Potato", "Chilli", "Turmeric", "Rice", "Wheat", "Millet", "Pulses", "Maize", "Soybean", "Other"];
 
-interface BookingForm {
-  product: string;
-  customProduct: string;
-  weightKg: string;
-  pickupLocation: string;
-  dropLocation: string;
-  date: string;
-  time: string;
-  offeredPrice: string;
-  notes: string;
-  phone: string;
+interface TransportForm {
+  product: string; customProduct: string; weightKg: string;
+  pickupLocation: string; dropLocation: string;
+  date: string; time: string; offeredPrice: string; notes: string; phone: string;
 }
 
-const EMPTY_FORM: BookingForm = {
+interface StorageForm {
+  unitId: string;
+  crop: string; customCrop: string; weightKg: string;
+  checkInDate: string; checkOutDate: string;
+  notes: string; phone: string;
+}
+
+const EMPTY_TRANSPORT: TransportForm = {
   product: "", customProduct: "", weightKg: "", pickupLocation: "",
   dropLocation: "", date: "", time: "", offeredPrice: "", notes: "", phone: "",
+};
+
+const EMPTY_STORAGE: StorageForm = {
+  unitId: "", crop: "", customCrop: "", weightKg: "",
+  checkInDate: "", checkOutDate: "", notes: "", phone: "",
 };
 
 export default function FarmerDashboard() {
   const { toast } = useToast();
   const { bookings, addBooking, farmerAccept, farmerReject } = useTransportBooking();
+  const { bookings: storageBookings, addBooking: addStorageBooking } = useStorageBooking();
 
-  const [smsCmd, setSmsCmd] = useState("");
-  const [showBookDialog, setShowBookDialog] = useState(false);
-  const [form, setForm] = useState<BookingForm>(EMPTY_FORM);
+  const [showTransportDialog, setShowTransportDialog] = useState(false);
+  const [showStorageDialog, setShowStorageDialog] = useState(false);
+  const [transportForm, setTransportForm] = useState<TransportForm>(EMPTY_TRANSPORT);
+  const [storageForm, setStorageForm] = useState<StorageForm>(EMPTY_STORAGE);
   const [activeTab, setActiveTab] = useState("overview");
+  const [smsCmd, setSmsCmd] = useState("");
 
   const [farmData, setFarmData] = useState({
     name: "Ramesh Kumar", village: "Warangal", crop: "Tomato", variety: "Hybrid F1",
     area: "3.5", sowingDate: "2024-07-15", harvestDate: "2024-10-15",
   });
 
-  // Only show bookings belonging to the logged-in farmer (mock: Ramesh Kumar)
-  const myBookings = bookings.filter(b => b.farmerName === "Ramesh Kumar");
-  const pendingCounter = myBookings.filter(b => b.status === "counter-sent").length;
+  const myTransportBookings = bookings.filter(b => b.farmerName === "Ramesh Kumar");
+  const myStorageBookings = storageBookings.filter(b => b.farmerName === "Ramesh Kumar");
+
+  const pendingCounter = myTransportBookings.filter(b => b.status === "counter-sent").length;
+  const pendingStorage = myStorageBookings.filter(b => b.status === "pending").length;
+  const totalBadges = pendingCounter + pendingStorage;
+
+  const setTF = (key: keyof TransportForm, val: string) =>
+    setTransportForm(p => ({ ...p, [key]: val }));
+
+  const setSF = (key: keyof StorageForm, val: string) =>
+    setStorageForm(p => ({ ...p, [key]: val }));
+
+  // ── Derived storage form calculations ──────────────────────────────────────
+  const selectedUnit = STORAGE_UNITS.find(u => String(u.id) === storageForm.unitId);
+  const storageDurationDays = storageForm.checkInDate && storageForm.checkOutDate
+    ? Math.max(1, Math.round((new Date(storageForm.checkOutDate).getTime() - new Date(storageForm.checkInDate).getTime()) / 86400000))
+    : 0;
+  const durationMonths = storageDurationDays / 30;
+  const estimatedStorageCost = selectedUnit && storageForm.weightKg
+    ? Math.round(Number(storageForm.weightKg) * selectedUnit.price * durationMonths)
+    : 0;
 
   const handleSMS = () => {
     if (!smsCmd.trim()) return;
@@ -88,38 +125,63 @@ export default function FarmerDashboard() {
   };
 
   const handleAction = (label: string) => {
-    if (label === "Request Transport") {
-      setShowBookDialog(true);
-      return;
-    }
-    toast({ title: `${label}`, description: "Feature initiated successfully" });
+    if (label === "Request Transport") { setShowTransportDialog(true); return; }
+    if (label === "Book Storage") { setShowStorageDialog(true); return; }
+    toast({ title: label, description: "Feature initiated successfully" });
   };
 
-  const setF = (key: keyof BookingForm, val: string) =>
-    setForm(p => ({ ...p, [key]: val }));
-
-  const handleSubmitBooking = () => {
-    const product = form.product === "Other" ? form.customProduct : form.product;
-    if (!product || !form.weightKg || !form.pickupLocation || !form.dropLocation || !form.date || !form.time || !form.offeredPrice || !form.phone) {
+  const handleSubmitTransport = () => {
+    const product = transportForm.product === "Other" ? transportForm.customProduct : transportForm.product;
+    if (!product || !transportForm.weightKg || !transportForm.pickupLocation || !transportForm.dropLocation || !transportForm.date || !transportForm.time || !transportForm.offeredPrice || !transportForm.phone) {
       toast({ title: "Please fill all required fields", variant: "destructive" });
       return;
     }
     addBooking({
-      farmerName: farmData.name,
-      farmerPhone: form.phone,
-      product,
-      weightKg: Number(form.weightKg),
-      pickupLocation: form.pickupLocation,
-      dropLocation: form.dropLocation,
-      date: form.date,
-      time: form.time,
-      offeredPrice: Number(form.offeredPrice),
-      notes: form.notes,
+      farmerName: farmData.name, farmerPhone: transportForm.phone,
+      product, weightKg: Number(transportForm.weightKg),
+      pickupLocation: transportForm.pickupLocation, dropLocation: transportForm.dropLocation,
+      date: transportForm.date, time: transportForm.time,
+      offeredPrice: Number(transportForm.offeredPrice), notes: transportForm.notes,
     });
     toast({ title: "🚚 Transport Booking Submitted!", description: "Transport owners will respond shortly." });
-    setForm(EMPTY_FORM);
-    setShowBookDialog(false);
-    setActiveTab("bookings");
+    setTransportForm(EMPTY_TRANSPORT);
+    setShowTransportDialog(false);
+    setActiveTab("transport");
+  };
+
+  const handleSubmitStorage = () => {
+    const crop = storageForm.crop === "Other" ? storageForm.customCrop : storageForm.crop;
+    if (!storageForm.unitId || !crop || !storageForm.weightKg || !storageForm.checkInDate || !storageForm.checkOutDate || !storageForm.phone) {
+      toast({ title: "Please fill all required fields", variant: "destructive" });
+      return;
+    }
+    if (!selectedUnit) return;
+    const availableKg = selectedUnit.capacity - selectedUnit.used;
+    if (Number(storageForm.weightKg) > availableKg) {
+      toast({ title: `Only ${availableKg.toLocaleString()} kg available in this unit`, variant: "destructive" });
+      return;
+    }
+    addStorageBooking({
+      unitId: selectedUnit.id,
+      unitName: selectedUnit.name,
+      unitLocation: selectedUnit.location,
+      storageType: selectedUnit.type as StorageType,
+      unitTemp: selectedUnit.temp,
+      pricePerKgPerMonth: selectedUnit.price,
+      farmerName: farmData.name,
+      farmerPhone: storageForm.phone,
+      crop,
+      weightKg: Number(storageForm.weightKg),
+      checkInDate: storageForm.checkInDate,
+      checkOutDate: storageForm.checkOutDate,
+      durationDays: storageDurationDays,
+      notes: storageForm.notes,
+      estimatedCost: estimatedStorageCost,
+    });
+    toast({ title: "🏪 Storage Booking Submitted!", description: `${selectedUnit.name} — manager will approve shortly.` });
+    setStorageForm(EMPTY_STORAGE);
+    setShowStorageDialog(false);
+    setActiveTab("storage");
   };
 
   return (
@@ -139,11 +201,19 @@ export default function FarmerDashboard() {
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="bg-muted flex-wrap h-auto gap-1">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="bookings" className="relative">
-                  🚚 My Bookings
+                <TabsTrigger value="transport" className="relative">
+                  🚚 Transport
                   {pendingCounter > 0 && (
                     <span className="absolute -top-1 -right-1 bg-accent text-foreground text-[9px] font-bold rounded-full px-1 leading-4 min-w-[16px] text-center">
                       {pendingCounter}
+                    </span>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="storage" className="relative">
+                  🏪 Storage
+                  {pendingStorage > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-accent text-foreground text-[9px] font-bold rounded-full px-1 leading-4 min-w-[16px] text-center">
+                      {pendingStorage}
                     </span>
                   )}
                 </TabsTrigger>
@@ -185,15 +255,15 @@ export default function FarmerDashboard() {
                       <AreaChart data={PRICE_HISTORY}>
                         <defs>
                           <linearGradient id="priceGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="hsl(123,45%,34%)" stopOpacity={0.2} />
-                            <stop offset="95%" stopColor="hsl(123,45%,34%)" stopOpacity={0} />
+                            <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.2} />
+                            <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                         <XAxis dataKey="day" tick={{ fontSize: 10 }} />
                         <YAxis tick={{ fontSize: 10 }} domain={[18, 36]} unit="₹" />
                         <Tooltip formatter={(v) => [`₹${v}/kg`, "Price"]} />
-                        <Area type="monotone" dataKey="price" stroke="hsl(123,45%,34%)" fill="url(#priceGrad)" strokeWidth={2} />
+                        <Area type="monotone" dataKey="price" stroke="hsl(var(--primary))" fill="url(#priceGrad)" strokeWidth={2} />
                       </AreaChart>
                     </ResponsiveContainer>
                   </CardContent>
@@ -241,31 +311,30 @@ export default function FarmerDashboard() {
                 </Card>
               </TabsContent>
 
-              {/* ── My Bookings ── */}
-              <TabsContent value="bookings" className="mt-4 space-y-4">
+              {/* ── Transport Bookings ── */}
+              <TabsContent value="transport" className="mt-4 space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold">My Transport Bookings</h3>
-                  <Button size="sm" className="bg-primary text-xs h-8" onClick={() => setShowBookDialog(true)}>
+                  <Button size="sm" className="bg-primary text-xs h-8" onClick={() => setShowTransportDialog(true)}>
                     + New Booking
                   </Button>
                 </div>
 
-                {myBookings.length === 0 && (
+                {myTransportBookings.length === 0 && (
                   <Card className="border-dashed border-border">
                     <CardContent className="py-12 text-center text-muted-foreground text-sm">
                       <div className="text-4xl mb-3">🚚</div>
                       <p>No transport bookings yet.</p>
-                      <Button size="sm" className="mt-4 bg-primary" onClick={() => setShowBookDialog(true)}>
+                      <Button size="sm" className="mt-4 bg-primary" onClick={() => setShowTransportDialog(true)}>
                         Book Transport Now
                       </Button>
                     </CardContent>
                   </Card>
                 )}
 
-                {myBookings.map((b) => {
+                {myTransportBookings.map((b) => {
                   const meta = STATUS_META[b.status] || STATUS_META["pending"];
                   const isCounter = b.status === "counter-sent";
-                  const isResolved = ["accepted", "rejected", "farmer-accepted", "farmer-rejected"].includes(b.status);
 
                   return (
                     <Card key={b.id} className={`border-2 transition-all ${
@@ -275,7 +344,6 @@ export default function FarmerDashboard() {
                       : "border-border"
                     }`}>
                       <CardContent className="p-4 space-y-3">
-                        {/* Header row */}
                         <div className="flex items-center justify-between flex-wrap gap-2">
                           <div className="flex items-center gap-2">
                             <span className="font-mono text-xs text-muted-foreground">{b.id}</span>
@@ -283,8 +351,6 @@ export default function FarmerDashboard() {
                           </div>
                           <span className="text-xs text-muted-foreground">{b.date} · {b.time}</span>
                         </div>
-
-                        {/* Details grid */}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs">
                           <div><span className="text-muted-foreground">Product</span><br /><span className="font-medium">{b.product}</span></div>
                           <div><span className="text-muted-foreground">Load</span><br /><span className="font-medium">{b.weightKg >= 1000 ? `${b.weightKg / 1000}T` : `${b.weightKg}kg`}</span></div>
@@ -292,18 +358,14 @@ export default function FarmerDashboard() {
                           <div><span className="text-muted-foreground">To</span><br /><span className="font-medium">{b.dropLocation}</span></div>
                           <div><span className="text-muted-foreground">Your Offer</span><br /><span className="font-semibold text-primary">₹{b.offeredPrice}</span></div>
                           {b.counterPrice && (
-                            <div><span className="text-muted-foreground">Counter Price</span><br /><span className="font-semibold text-accent-foreground">₹{b.counterPrice}</span></div>
+                            <div><span className="text-muted-foreground">Counter Price</span><br /><span className="font-semibold">₹{b.counterPrice}</span></div>
                           )}
                         </div>
-
-                        {/* Counter note */}
                         {isCounter && b.counterNote && (
                           <div className="bg-accent/10 rounded-lg px-3 py-2 text-xs text-foreground border border-accent/30">
                             💬 Transport owner's note: <span className="font-medium">{b.counterNote}</span>
                           </div>
                         )}
-
-                        {/* Counter-offer action buttons */}
                         {isCounter && (
                           <div className="pt-2 border-t border-border flex gap-2 flex-wrap items-center">
                             <p className="text-xs text-muted-foreground flex-1">
@@ -313,14 +375,12 @@ export default function FarmerDashboard() {
                               onClick={() => { farmerAccept(b.id); toast({ title: "✅ Counter accepted!", description: `Trip confirmed for ₹${b.counterPrice}` }); }}>
                               ✅ Accept ₹{b.counterPrice}
                             </Button>
-                            <Button size="sm" variant="outline"
-                              className="text-xs h-8 border-destructive/50 text-destructive"
+                            <Button size="sm" variant="outline" className="text-xs h-8 border-destructive/50 text-destructive"
                               onClick={() => { farmerReject(b.id); toast({ title: "❌ Counter declined", variant: "destructive" }); }}>
                               ✗ Decline
                             </Button>
                           </div>
                         )}
-
                         {b.status === "farmer-accepted" && (
                           <div className="text-xs text-primary font-medium pt-1 border-t border-primary/20">
                             🎉 Trip confirmed at ₹{b.counterPrice || b.offeredPrice} — transport owner will contact you soon.
@@ -330,6 +390,79 @@ export default function FarmerDashboard() {
                     </Card>
                   );
                 })}
+              </TabsContent>
+
+              {/* ── Storage Bookings ── */}
+              <TabsContent value="storage" className="mt-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">My Storage Bookings</h3>
+                  <Button size="sm" className="bg-primary text-xs h-8" onClick={() => setShowStorageDialog(true)}>
+                    + Book Storage
+                  </Button>
+                </div>
+
+                {myStorageBookings.length === 0 ? (
+                  <Card className="border-dashed border-border">
+                    <CardContent className="py-12 text-center text-muted-foreground text-sm">
+                      <div className="text-4xl mb-3">🏪</div>
+                      <p>No storage bookings yet.</p>
+                      <Button size="sm" className="mt-4 bg-primary" onClick={() => setShowStorageDialog(true)}>
+                        Book Storage Now
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  myStorageBookings.map((b) => {
+                    const meta = STORAGE_STATUS_META[b.status] || STORAGE_STATUS_META["pending"];
+                    const typeIcon = b.storageType === "Cold Storage" ? "❄️" : b.storageType === "Silo" ? "🛢️" : "🏭";
+
+                    return (
+                      <Card key={b.id} className={`border-2 transition-all ${
+                        b.status === "approved" || b.status === "active" ? "border-primary/40 bg-primary/5"
+                        : b.status === "rejected" || b.status === "cancelled" ? "border-destructive/30 opacity-70"
+                        : b.status === "completed" ? "border-border opacity-80"
+                        : "border-border"
+                      }`}>
+                        <CardContent className="p-4 space-y-3">
+                          <div className="flex items-center justify-between flex-wrap gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs text-muted-foreground">{b.id}</span>
+                              <Badge variant="outline" className={`text-xs ${meta.color}`}>{meta.label}</Badge>
+                            </div>
+                            <Badge variant="outline" className="text-xs">
+                              {typeIcon} {b.storageType}
+                            </Badge>
+                          </div>
+
+                          <div className="font-semibold text-sm text-foreground">{b.unitName}</div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs">
+                            <div><span className="text-muted-foreground">Crop</span><br /><span className="font-medium">{b.crop}</span></div>
+                            <div><span className="text-muted-foreground">Quantity</span><br /><span className="font-medium">{b.weightKg >= 1000 ? `${(b.weightKg / 1000).toFixed(1)}T` : `${b.weightKg}kg`}</span></div>
+                            <div><span className="text-muted-foreground">Check-in</span><br /><span className="font-medium">{b.checkInDate}</span></div>
+                            <div><span className="text-muted-foreground">Check-out</span><br /><span className="font-medium">{b.checkOutDate}</span></div>
+                            <div><span className="text-muted-foreground">Duration</span><br /><span className="font-medium">{b.durationDays} days</span></div>
+                            <div><span className="text-muted-foreground">Temp</span><br /><span className="font-medium">🌡️ {b.unitTemp}</span></div>
+                            <div><span className="text-muted-foreground">Est. Cost</span><br /><span className="font-semibold text-primary">₹{b.estimatedCost.toLocaleString()}</span></div>
+                            <div><span className="text-muted-foreground">Rate</span><br /><span className="font-medium">₹{b.pricePerKgPerMonth}/kg/mo</span></div>
+                          </div>
+
+                          {b.managerNote && (
+                            <div className={`rounded-lg px-3 py-2 text-xs border ${b.status === "rejected" ? "bg-destructive/10 border-destructive/30 text-destructive" : "bg-primary/5 border-primary/20 text-foreground"}`}>
+                              💬 Manager note: <span className="font-medium">{b.managerNote}</span>
+                            </div>
+                          )}
+
+                          {b.status === "approved" && (
+                            <div className="text-xs text-primary font-medium pt-1 border-t border-primary/20">
+                              ✅ Booking approved! Bring your produce to {b.unitName} on {b.checkInDate}.
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })
+                )}
               </TabsContent>
 
               {/* ── Farm Details ── */}
@@ -348,17 +481,11 @@ export default function FarmerDashboard() {
                     ].map((f) => (
                       <div key={f.key} className="space-y-1">
                         <Label className="text-xs">{f.label}</Label>
-                        <Input
-                          value={(farmData as any)[f.key]}
-                          onChange={(e) => setFarmData(prev => ({ ...prev, [f.key]: e.target.value }))}
-                          className="text-sm"
-                        />
+                        <Input value={(farmData as any)[f.key]} onChange={(e) => setFarmData(prev => ({ ...prev, [f.key]: e.target.value }))} className="text-sm" />
                       </div>
                     ))}
                     <div className="sm:col-span-2">
-                      <Button className="w-full bg-primary" onClick={() => toast({ title: "Farm details saved ✅" })}>
-                        Save Farm Details
-                      </Button>
+                      <Button className="w-full bg-primary" onClick={() => toast({ title: "Farm details saved ✅" })}>Save Farm Details</Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -402,101 +529,178 @@ export default function FarmerDashboard() {
       </div>
 
       {/* ── Book Transport Dialog ── */}
-      <Dialog open={showBookDialog} onOpenChange={setShowBookDialog}>
+      <Dialog open={showTransportDialog} onOpenChange={setShowTransportDialog}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <span>🚚</span> Book Transport
-            </DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><span>🚚</span> Book Transport</DialogTitle>
           </DialogHeader>
-
           <div className="space-y-4 py-2">
-            {/* Product */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1 col-span-2 sm:col-span-1">
                 <Label className="text-xs">Product / Crop *</Label>
-                <Select value={form.product} onValueChange={(v) => setF("product", v)}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="Select crop" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CROPS_LIST.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
+                <Select value={transportForm.product} onValueChange={(v) => setTF("product", v)}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select crop" /></SelectTrigger>
+                  <SelectContent>{CROPS_LIST.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              {form.product === "Other" && (
+              {transportForm.product === "Other" && (
                 <div className="space-y-1">
                   <Label className="text-xs">Specify Crop *</Label>
-                  <Input className="h-9 text-sm" placeholder="e.g. Brinjal" value={form.customProduct} onChange={e => setF("customProduct", e.target.value)} />
+                  <Input className="h-9 text-sm" placeholder="e.g. Brinjal" value={transportForm.customProduct} onChange={e => setTF("customProduct", e.target.value)} />
                 </div>
               )}
-
-              {/* Weight */}
               <div className="space-y-1">
                 <Label className="text-xs">Total Load Weight (kg) *</Label>
-                <Input className="h-9 text-sm" type="number" placeholder="e.g. 3500" value={form.weightKg} onChange={e => setF("weightKg", e.target.value)} />
+                <Input className="h-9 text-sm" type="number" placeholder="e.g. 3500" value={transportForm.weightKg} onChange={e => setTF("weightKg", e.target.value)} />
               </div>
             </div>
-
-            {/* Route */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">Pickup Location *</Label>
-                <Input className="h-9 text-sm" placeholder="e.g. Warangal" value={form.pickupLocation} onChange={e => setF("pickupLocation", e.target.value)} />
+                <Input className="h-9 text-sm" placeholder="e.g. Warangal" value={transportForm.pickupLocation} onChange={e => setTF("pickupLocation", e.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Drop Location *</Label>
-                <Input className="h-9 text-sm" placeholder="e.g. Hyderabad" value={form.dropLocation} onChange={e => setF("dropLocation", e.target.value)} />
+                <Input className="h-9 text-sm" placeholder="e.g. Hyderabad" value={transportForm.dropLocation} onChange={e => setTF("dropLocation", e.target.value)} />
               </div>
             </div>
-
-            {/* Date & Time */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">Pickup Date *</Label>
-                <Input className="h-9 text-sm" type="date" value={form.date} onChange={e => setF("date", e.target.value)} />
+                <Input className="h-9 text-sm" type="date" value={transportForm.date} onChange={e => setTF("date", e.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Pickup Time *</Label>
-                <Input className="h-9 text-sm" type="time" value={form.time} onChange={e => setF("time", e.target.value)} />
+                <Input className="h-9 text-sm" type="time" value={transportForm.time} onChange={e => setTF("time", e.target.value)} />
               </div>
             </div>
-
-            {/* Price & Phone */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">Your Offered Price (₹) *</Label>
-                <Input className="h-9 text-sm" type="number" placeholder="e.g. 2800" value={form.offeredPrice} onChange={e => setF("offeredPrice", e.target.value)} />
+                <Input className="h-9 text-sm" type="number" placeholder="e.g. 2800" value={transportForm.offeredPrice} onChange={e => setTF("offeredPrice", e.target.value)} />
                 <p className="text-[10px] text-muted-foreground">Transport owner can counter this</p>
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Your Phone Number *</Label>
-                <Input className="h-9 text-sm" type="tel" placeholder="e.g. 98765 43210" value={form.phone} onChange={e => setF("phone", e.target.value)} />
+                <Input className="h-9 text-sm" type="tel" placeholder="e.g. 98765 43210" value={transportForm.phone} onChange={e => setTF("phone", e.target.value)} />
               </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Additional Notes</Label>
+              <Input className="h-9 text-sm" placeholder="e.g. Urgent, festival delivery..." value={transportForm.notes} onChange={e => setTF("notes", e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowTransportDialog(false)}>Cancel</Button>
+            <Button size="sm" className="bg-primary" onClick={handleSubmitTransport}>Submit Booking</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Book Storage Dialog ── */}
+      <Dialog open={showStorageDialog} onOpenChange={setShowStorageDialog}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><span>🏪</span> Book Storage Unit</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {/* Unit selection */}
+            <div className="space-y-1">
+              <Label className="text-xs">Storage Facility *</Label>
+              <Select value={storageForm.unitId} onValueChange={(v) => setSF("unitId", v)}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Choose a storage unit" /></SelectTrigger>
+                <SelectContent>
+                  {STORAGE_UNITS.map(u => {
+                    const avail = u.capacity - u.used;
+                    const pct = Math.round((u.used / u.capacity) * 100);
+                    return (
+                      <SelectItem key={u.id} value={String(u.id)} disabled={pct >= 95}>
+                        {u.type === "Cold Storage" ? "❄️" : u.type === "Silo" ? "🛢️" : "🏭"} {u.name} — {avail.toLocaleString()}kg free · ₹{u.price}/kg/mo{pct >= 95 ? " (Full)" : ""}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              {selectedUnit && (
+                <div className="mt-2 grid grid-cols-3 gap-2 text-[10px] text-center">
+                  {[
+                    { l: "Type", v: selectedUnit.type },
+                    { l: "Temp", v: selectedUnit.temp },
+                    { l: "Available", v: `${(selectedUnit.capacity - selectedUnit.used).toLocaleString()} kg` },
+                  ].map(s => (
+                    <div key={s.l} className="bg-muted/60 rounded p-2">
+                      <div className="text-muted-foreground">{s.l}</div>
+                      <div className="font-semibold text-foreground">{s.v}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Crop & Weight */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Crop / Product *</Label>
+                <Select value={storageForm.crop} onValueChange={(v) => setSF("crop", v)}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select crop" /></SelectTrigger>
+                  <SelectContent>{CROPS_LIST.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              {storageForm.crop === "Other" && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Specify *</Label>
+                  <Input className="h-9 text-sm" placeholder="e.g. Brinjal" value={storageForm.customCrop} onChange={e => setSF("customCrop", e.target.value)} />
+                </div>
+              )}
+              <div className="space-y-1">
+                <Label className="text-xs">Quantity (kg) *</Label>
+                <Input className="h-9 text-sm" type="number" placeholder="e.g. 2000" value={storageForm.weightKg} onChange={e => setSF("weightKg", e.target.value)} />
+                {selectedUnit && storageForm.weightKg && Number(storageForm.weightKg) > (selectedUnit.capacity - selectedUnit.used) && (
+                  <p className="text-[10px] text-destructive">Exceeds available space ({(selectedUnit.capacity - selectedUnit.used).toLocaleString()} kg)</p>
+                )}
+              </div>
+            </div>
+
+            {/* Dates */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Check-in Date *</Label>
+                <Input className="h-9 text-sm" type="date" value={storageForm.checkInDate} onChange={e => setSF("checkInDate", e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Check-out Date *</Label>
+                <Input className="h-9 text-sm" type="date" value={storageForm.checkOutDate} onChange={e => setSF("checkOutDate", e.target.value)} />
+              </div>
+            </div>
+
+            {/* Phone */}
+            <div className="space-y-1">
+              <Label className="text-xs">Your Phone Number *</Label>
+              <Input className="h-9 text-sm" type="tel" placeholder="e.g. 98765 43210" value={storageForm.phone} onChange={e => setSF("phone", e.target.value)} />
             </div>
 
             {/* Notes */}
             <div className="space-y-1">
-              <Label className="text-xs">Additional Notes</Label>
-              <Input className="h-9 text-sm" placeholder="e.g. Urgent, festival delivery, handle with care..." value={form.notes} onChange={e => setF("notes", e.target.value)} />
+              <Label className="text-xs">Notes / Special Requirements</Label>
+              <Input className="h-9 text-sm" placeholder="e.g. Organic batch, handle with care..." value={storageForm.notes} onChange={e => setSF("notes", e.target.value)} />
             </div>
 
-            {/* Summary */}
-            {form.weightKg && form.offeredPrice && (
+            {/* Cost preview */}
+            {estimatedStorageCost > 0 && (
               <div className="bg-primary/5 rounded-lg p-3 text-xs border border-primary/20 space-y-1">
-                <div className="font-medium text-primary">📋 Booking Summary</div>
+                <div className="font-semibold text-primary">📋 Cost Estimate</div>
                 <div className="grid grid-cols-2 gap-1 text-muted-foreground">
-                  <span>Load:</span><span className="text-foreground font-medium">{Number(form.weightKg) >= 1000 ? `${Number(form.weightKg)/1000}T` : `${form.weightKg}kg`}</span>
-                  <span>Route:</span><span className="text-foreground font-medium">{form.pickupLocation || "—"} → {form.dropLocation || "—"}</span>
-                  <span>Offered:</span><span className="text-foreground font-medium">₹{form.offeredPrice}</span>
+                  <span>Quantity:</span><span className="text-foreground font-medium">{storageForm.weightKg} kg</span>
+                  <span>Duration:</span><span className="text-foreground font-medium">{storageDurationDays} days ({(durationMonths).toFixed(1)} months)</span>
+                  <span>Rate:</span><span className="text-foreground font-medium">₹{selectedUnit?.price}/kg/month</span>
+                  <span>Total Estimate:</span><span className="text-primary font-bold text-sm">₹{estimatedStorageCost.toLocaleString()}</span>
                 </div>
               </div>
             )}
           </div>
-
           <DialogFooter className="gap-2">
-            <Button variant="outline" size="sm" onClick={() => setShowBookDialog(false)}>Cancel</Button>
-            <Button size="sm" className="bg-primary" onClick={handleSubmitBooking}>Submit Booking</Button>
+            <Button variant="outline" size="sm" onClick={() => setShowStorageDialog(false)}>Cancel</Button>
+            <Button size="sm" className="bg-primary" onClick={handleSubmitStorage}>Submit Booking</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
