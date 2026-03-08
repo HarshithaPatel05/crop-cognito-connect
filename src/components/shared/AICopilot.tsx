@@ -130,6 +130,7 @@ export function AICopilot() {
   const [listening, setListening] = useState(false);
   const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
   const [ttsLoading, setTtsLoading] = useState(false);
+  const [autoRead, setAutoRead] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
@@ -179,6 +180,7 @@ export function AICopilot() {
     setLoading(true);
 
     let assistantText = "";
+    let finalIdx = -1;
     await streamCopilot({
       messages: [...messages, userMsg],
       language: lang,
@@ -188,14 +190,22 @@ export function AICopilot() {
         setMessages((prev) => {
           const last = prev[prev.length - 1];
           if (last?.role === "assistant") {
+            finalIdx = prev.length - 1;
             return prev.map((m, i) =>
               i === prev.length - 1 ? { ...m, content: assistantText } : m
             );
           }
+          finalIdx = prev.length;
           return [...prev, { role: "assistant", content: assistantText }];
         });
       },
-      onDone: () => setLoading(false),
+      onDone: () => {
+        setLoading(false);
+        if (autoRead && assistantText) {
+          // slight delay so state settles
+          setTimeout(() => speak(assistantText, finalIdx), 100);
+        }
+      },
       onError: (err) => {
         setLoading(false);
         toast({ variant: "destructive", title: "AI Error", description: err });
@@ -299,6 +309,18 @@ export function AICopilot() {
               <div className="text-primary-foreground font-semibold text-sm leading-tight">AgroSense Copilot</div>
               <div className="text-primary-foreground/70 text-[10px]">AI · Sell Time · Transport · Storage</div>
             </div>
+            {/* Auto-read toggle */}
+            <button
+              onClick={() => setAutoRead((v) => !v)}
+              title={autoRead ? "Auto-read ON — click to disable" : "Auto-read OFF — click to enable"}
+              className={`w-7 h-7 rounded-full flex items-center justify-center transition-all mr-1 ${
+                autoRead
+                  ? "bg-primary-foreground text-primary"
+                  : "bg-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/40"
+              }`}
+            >
+              {autoRead ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+            </button>
             {/* Language switcher */}
             <div className="flex gap-1 mr-1">
               {(["en", "te", "hi"] as Language[]).map((l) => (
