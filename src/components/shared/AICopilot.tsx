@@ -18,24 +18,67 @@ const QUICK_PROMPTS: Record<Language, string[]> = {
 };
 
 // Browser Web Speech API fallback
+const LANG_BCP47: Record<string, string> = { te: "te-IN", hi: "hi-IN", en: "en-IN" };
+
+// Returns the best available SpeechSynthesisVoice for a BCP-47 lang tag, or null
+function findVoice(bcp47: string): SpeechSynthesisVoice | null {
+  const voices = window.speechSynthesis?.getVoices() ?? [];
+  // Exact match first, then prefix match (e.g. "te" in "te-IN")
+  return (
+    voices.find((v) => v.lang === bcp47) ||
+    voices.find((v) => v.lang.startsWith(bcp47.split("-")[0])) ||
+    null
+  );
+}
+
 function speakWithBrowser(
   text: string,
   lang: string,
   onStart: () => void,
   onEnd: () => void,
-  onError: (msg: string) => void
+  onNoVoice: () => void,
 ): SpeechSynthesisUtterance | null {
-  if (!window.speechSynthesis) { onError("Speech synthesis not supported"); return null; }
+  if (!window.speechSynthesis) { onEnd(); return null; }
   window.speechSynthesis.cancel();
-  const clean = text.replace(/[*_`#~>]/g, "").replace(/\n+/g, ". ").trim().slice(0, 3000);
-  const utt = new SpeechSynthesisUtterance(clean);
-  utt.lang = lang === "te" ? "te-IN" : lang === "hi" ? "hi-IN" : "en-IN";
-  utt.rate = 0.9;
-  utt.onstart = onStart;
-  utt.onend = onEnd;
-  utt.onerror = () => onError("Browser TTS error");
-  window.speechSynthesis.speak(utt);
-  return utt;
+
+  const bcp47 = LANG_BCP47[lang] ?? "en-IN";
+
+  const doSpeak = () => {
+    const voice = findVoice(bcp47);
+    if (!voice && lang !== "en") {
+      // No native voice for this script — don't garble numbers/symbols
+      onNoVoice();
+      return null;
+    }
+    // Strip markdown, emoji and keep only printable chars the voice can handle
+    const clean = text
+      .replace(/[*_`#~>]/g, "")
+      .replace(/\n+/g, ". ")
+      // Remove emoji (broad Unicode ranges)
+      .replace(/[\u{1F300}-\u{1FFFF}]/gu, "")
+      .replace(/\s{2,}/g, " ")
+      .trim()
+      .slice(0, 3000);
+    const utt = new SpeechSynthesisUtterance(clean);
+    utt.lang = bcp47;
+    if (voice) utt.voice = voice;
+    utt.rate = 0.9;
+    utt.onstart = onStart;
+    utt.onend = onEnd;
+    utt.onerror = () => onEnd();
+    window.speechSynthesis.speak(utt);
+    return utt;
+  };
+
+  // Voices may not be loaded yet on first call
+  if (window.speechSynthesis.getVoices().length === 0) {
+    window.speechSynthesis.onvoiceschanged = () => {
+      window.speechSynthesis.onvoiceschanged = null;
+      doSpeak();
+    };
+    return null;
+  }
+  return doSpeak() ?? null;
 }
 
 // Use browser Web Speech API directly (ElevenLabs Free Tier is restricted)
@@ -44,8 +87,9 @@ function playTTS(
   lang: string,
   onStart: () => void,
   onEnd: () => void,
+  onNoVoice: () => void,
 ): void {
-  speakWithBrowser(text, lang, onStart, onEnd, onEnd);
+  speakWithBrowser(text, lang, onStart, onEnd, onNoVoice);
 }
 
 // Stream SSE response from edge function
@@ -221,6 +265,17 @@ export function AICopilot() {
       lang,
       () => { setSpeakingIdx(idx); },
       () => { setSpeakingIdx(null); setTtsLoading(false); },
+      () => {
+        setSpeakingIdx(null);
+        setTtsLoading(false);
+        toast({
+          title: lang === "te" ? "Telugu voice unavailable" : "Hindi voice unavailable",
+          description: lang === "te"
+            ? "Your device doesn't have a Telugu voice installed. Install a Telugu TTS voice in your system settings to hear responses in Telugu."
+            : "Your device doesn't have a Hindi voice installed. Install a Hindi TTS voice in your system settings to hear responses in Hindi.",
+          duration: 5000,
+        });
+      },
     );
   };
 
