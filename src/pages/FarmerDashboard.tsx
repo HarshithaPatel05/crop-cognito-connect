@@ -204,7 +204,7 @@ export default function FarmerDashboard() {
   };
 
   return (
-    <AppLayout title="Farmer Dashboard" subtitle="Ramesh Kumar · Warangal · Tomato Farm">
+    <AppLayout title="Farmer Dashboard" subtitle={`${farmerName} · ${farmerLocation} · ${primaryCrop} Farm`}>
       <div className="space-y-6 animate-fade-in">
         {/* KPI row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
