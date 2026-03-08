@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StarRating } from "@/components/shared/StarRating";
 import { StatCard } from "@/components/shared/StatCard";
 import { VoiceAssistant } from "@/components/shared/VoiceAssistant";
+import { RatingBadge } from "@/components/shared/RatingBadge";
 import { useToast } from "@/hooks/use-toast";
 import { useTransportBooking } from "@/context/TransportBookingContext";
 import { useRole, TransportProfile } from "@/context/RoleContext";
