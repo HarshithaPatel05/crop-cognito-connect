@@ -497,6 +497,38 @@ export default function TransportDashboard() {
           <StatCard title="Free Capacity" value={`${(overallFreeKg / 1000).toFixed(1)}T`} icon="⚖️" trend={overallUsedPct > 80 ? "up" : "stable"} trendValue={`${overallUsedPct}% utilised`} />
         </div>
 
+        {/* ── Profile Summary Banner ── */}
+        {user?.profile && (
+          <Card className="border-secondary/20 bg-secondary/5">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-3xl">🚚</span>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-foreground">{ownerName}</div>
+                  <div className="text-xs text-muted-foreground">{ownerLoc}</div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-x-6 gap-y-1 text-xs flex-1">
+                  {[
+                    { l: "🚛 Vehicle Type", v: vType },
+                    { l: "🔑 Reg. No.", v: vNo },
+                    { l: "⚖️ Capacity", v: `${vCap} Ton` },
+                    { l: "❄️ Refrigerated", v: isRefrig ? "Yes" : "No" },
+                    { l: "⛽ Fuel", v: fuelType },
+                    { l: "🗺️ Routes", v: routes },
+                    { l: "📅 Trips/Month", v: tripsPerMo },
+                    { l: "🪪 License", v: driverLic || "—" },
+                  ].filter(r => r.v && r.v !== "—").map(r => (
+                    <div key={r.l}>
+                      <div className="text-muted-foreground">{r.l}</div>
+                      <div className="font-semibold text-foreground">{r.v}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Tabs defaultValue="schedule">
           <TabsList className="flex-wrap h-auto gap-1">
             <TabsTrigger value="schedule" className="relative">

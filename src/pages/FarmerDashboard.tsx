@@ -215,6 +215,39 @@ export default function FarmerDashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* ── Profile Summary Card ── */}
+          {user?.profile && (
+            <div className="lg:col-span-3">
+              <Card className="border-primary/20 bg-primary/3">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="text-3xl">👨‍🌾</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-foreground">{farmerName}</div>
+                      <div className="text-xs text-muted-foreground">{farmerLocation}</div>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-x-6 gap-y-1 text-xs flex-1">
+                      {[
+                        { l: "🌱 Primary Crop", v: primaryCrop },
+                        { l: "🌿 Secondary", v: secondaryCrop || "—" },
+                        { l: "📐 Farm Area", v: farmArea },
+                        { l: "🌾 Season", v: harvestSeason },
+                        { l: "🔬 Farming", v: farmingType },
+                        { l: "🏗️ Soil", v: soilType },
+                        { l: "💧 Irrigation", v: irrigationType },
+                        { l: "📦 Annual Yield", v: annualYield },
+                      ].filter(r => r.v && r.v !== "—").map(r => (
+                        <div key={r.l}>
+                          <div className="text-muted-foreground">{r.l}</div>
+                          <div className="font-semibold text-foreground">{r.v}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
           {/* Left column */}
           <div className="lg:col-span-2 space-y-5">
             <Tabs value={activeTab} onValueChange={setActiveTab}>

@@ -140,6 +140,37 @@ export default function StorageDashboard() {
           <StatCard title="Total Scheduled" value={`${(totalScheduledKg / 1000).toFixed(1)}T`} icon="⚖️" trend="stable" trendValue="Across all units" />
         </div>
 
+        {/* ── Profile Summary Banner ── */}
+        {user?.profile && (
+          <Card className="border-accent/20 bg-accent/5">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-3xl">🏪</span>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-foreground">{facilityName}</div>
+                  <div className="text-xs text-muted-foreground">{user?.location}</div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-x-6 gap-y-1 text-xs flex-1">
+                  {[
+                    { l: "🏗️ Type", v: storageType },
+                    { l: "⚖️ Capacity", v: `${storageCapTon}T` },
+                    { l: "🌡️ Temp Range", v: tempRange },
+                    { l: "🔢 Units/Cells", v: unitsCount },
+                    { l: "₹ Rate/Ton/Day", v: ratePerTonDay ? `₹${ratePerTonDay}` : "—" },
+                    { l: "🛡️ Insured", v: insured },
+                    { l: "📜 FSSAI", v: fssaiNo || "—" },
+                  ].filter(r => r.v && r.v !== "—").map(r => (
+                    <div key={r.l}>
+                      <div className="text-muted-foreground">{r.l}</div>
+                      <div className="font-semibold text-foreground">{r.v}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Tabs defaultValue="schedule">
           <TabsList className="flex-wrap h-auto gap-1">
             <TabsTrigger value="schedule" className="relative">
