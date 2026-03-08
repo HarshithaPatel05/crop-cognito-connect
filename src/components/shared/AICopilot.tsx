@@ -1,9 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { X, Mic, MicOff, Send, Bot, Loader2 } from "lucide-react";
+import { X, Mic, MicOff, Send, Loader2, Volume2, VolumeX } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 type Language = "en" | "te" | "hi";
@@ -90,6 +89,7 @@ export function AICopilot() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
+  const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
@@ -161,6 +161,29 @@ export function AICopilot() {
     });
   };
 
+  const speak = (text: string, idx: number) => {
+    if (!window.speechSynthesis) {
+      toast({ title: "Not supported", description: "Text-to-speech not supported on this browser." });
+      return;
+    }
+    // If already speaking this message, stop it
+    if (speakingIdx === idx) {
+      window.speechSynthesis.cancel();
+      setSpeakingIdx(null);
+      return;
+    }
+    window.speechSynthesis.cancel();
+    // Strip markdown-like symbols for cleaner speech
+    const clean = text.replace(/[*_`#~>]/g, "").replace(/\n+/g, " ");
+    const utterance = new SpeechSynthesisUtterance(clean);
+    utterance.lang = lang === "te" ? "te-IN" : lang === "hi" ? "hi-IN" : "en-IN";
+    utterance.rate = 0.92;
+    utterance.onstart = () => setSpeakingIdx(idx);
+    utterance.onend = () => setSpeakingIdx(null);
+    utterance.onerror = () => setSpeakingIdx(null);
+    window.speechSynthesis.speak(utterance);
+  };
+
   const toggleVoice = () => {
     type SpeechRecognitionCtor = new () => SpeechRecognitionEvent & {
       lang: string; interimResults: boolean;
@@ -215,7 +238,7 @@ export function AICopilot() {
         <div className="fixed bottom-24 right-6 z-50 w-96 max-w-[calc(100vw-2rem)] bg-card rounded-2xl shadow-2xl border border-primary/20 flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
           {/* Header */}
           <div className="bg-gradient-to-r from-primary to-primary/80 px-4 py-3 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-primary-foreground/20 flex items-center justify-center text-lg flex-shrink-0">🤖</div>
+        <div className="w-9 h-9 rounded-full bg-primary-foreground/20 flex items-center justify-center text-lg flex-shrink-0">🤖</div>
             <div className="flex-1 min-w-0">
               <div className="text-primary-foreground font-semibold text-sm leading-tight">AgroSense Copilot</div>
               <div className="text-primary-foreground/70 text-[10px]">AI · Sell Time · Transport · Storage</div>
@@ -241,7 +264,7 @@ export function AICopilot() {
               variant="ghost"
               size="icon"
               className="h-7 w-7 text-primary-foreground hover:bg-primary/60 flex-shrink-0"
-              onClick={() => setOpen(false)}
+              onClick={() => { window.speechSynthesis?.cancel(); setSpeakingIdx(null); setOpen(false); }}
             >
               <X className="w-4 h-4" />
             </Button>
@@ -257,14 +280,28 @@ export function AICopilot() {
                 {msg.role === "assistant" && (
                   <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center mr-1.5 flex-shrink-0 mt-0.5 text-sm">🤖</div>
                 )}
-                <div
-                  className={`max-w-[82%] rounded-2xl px-3 py-2 text-xs leading-relaxed ${
-                    msg.role === "user"
-                      ? "bg-primary text-primary-foreground rounded-tr-sm"
-                      : "bg-muted text-foreground rounded-tl-sm"
-                  }`}
-                >
+                <div className={`max-w-[82%] rounded-2xl px-3 py-2 text-xs leading-relaxed ${
+                  msg.role === "user"
+                    ? "bg-primary text-primary-foreground rounded-tr-sm"
+                    : "bg-muted text-foreground rounded-tl-sm"
+                }`}>
                   {msg.content}
+                  {msg.role === "assistant" && (
+                    <button
+                      onClick={() => speak(msg.content, i)}
+                      title={speakingIdx === i ? "Stop reading" : "Read aloud"}
+                      className={`mt-1.5 flex items-center gap-1 text-[10px] transition-colors ${
+                        speakingIdx === i
+                          ? "text-primary font-medium"
+                          : "text-muted-foreground hover:text-primary"
+                      }`}
+                    >
+                      {speakingIdx === i
+                        ? <><VolumeX className="w-3 h-3" /> Stop</>
+                        : <><Volume2 className="w-3 h-3" /> Read aloud</>
+                      }
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
