@@ -27,8 +27,19 @@ export interface TransportBooking {
   counterNote?: string;
   // Which vehicle this booking is targeted to (null = broadcast to all)
   targetVehicleId?: string | null;
+  // Confirmed pickup time set by owner (may differ from requested time if shared)
+  confirmedPickupTime?: string;
   // Timestamps
   createdAt: string;
+}
+
+// ── Pickup conflict: same vehicle, same date, same time slot, 2+ confirmed bookings ─
+export interface PickupConflict {
+  vehicleId: string;
+  date: string;
+  time: string;       // shared confirmed pickup time
+  bookingIds: string[];
+  farmerNames: string[];
 }
 
 // ── Available transport vehicles registry ─────────────────────────────────────
