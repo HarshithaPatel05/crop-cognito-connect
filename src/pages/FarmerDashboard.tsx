@@ -1176,6 +1176,346 @@ export default function FarmerDashboard() {
                   ))}
                 </div>
               </TabsContent>
+
+              {/* ══════════════════════════════════════════════════════════
+                  TAB: CROP PHOTOS
+              ══════════════════════════════════════════════════════════ */}
+              <TabsContent value="photos" className="mt-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold">Crop Photo Gallery</h3>
+                    <p className="text-xs text-muted-foreground">Upload field photos for AI analysis &amp; buyer visibility</p>
+                  </div>
+                  <Button size="sm" className="bg-primary text-xs h-8" onClick={() => photoInputRef.current?.click()}>
+                    📸 Add Photo
+                  </Button>
+                  <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+                </div>
+
+                {/* Upload form */}
+                <Card className="border-dashed border-primary/40 bg-primary/3">
+                  <CardContent className="p-4 space-y-3">
+                    <div className="text-xs font-medium text-foreground">Add a new crop photo</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Caption</Label>
+                        <Input className="h-8 text-xs" placeholder="e.g. Week 8 growth" value={photoCaption} onChange={e => setPhotoCaption(e.target.value)} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Note</Label>
+                        <Input className="h-8 text-xs" placeholder="e.g. Pest spotted" value={photoNote} onChange={e => setPhotoNote(e.target.value)} />
+                      </div>
+                    </div>
+                    <Button size="sm" className="w-full bg-primary text-xs h-8" onClick={() => photoInputRef.current?.click()}>
+                      📁 Choose Photo from Device
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Gallery grid */}
+                <div className="grid grid-cols-2 gap-3">
+                  {cropPhotos.map(p => (
+                    <Card key={p.id} className="overflow-hidden border-border group">
+                      <div className="relative">
+                        <img src={p.url} alt={p.label} className="w-full h-36 object-cover group-hover:scale-105 transition-transform duration-200" />
+                        <div className="absolute top-1 right-1">
+                          <button
+                            className="bg-destructive/80 text-destructive-foreground rounded-full w-5 h-5 text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => setCropPhotos(prev => prev.filter(x => x.id !== p.id))}
+                          >✕</button>
+                        </div>
+                      </div>
+                      <CardContent className="p-2 space-y-0.5">
+                        <div className="text-xs font-medium text-foreground truncate">{p.label}</div>
+                        <div className="flex justify-between text-[10px] text-muted-foreground">
+                          <span>{p.date}</span>
+                          <span className="truncate ml-1">{p.note}</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                  {cropPhotos.length === 0 && (
+                    <div className="col-span-2 text-center text-muted-foreground text-sm py-12">
+                      <div className="text-4xl mb-2">📷</div>
+                      <p>No crop photos yet. Upload your first photo!</p>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              {/* ══════════════════════════════════════════════════════════
+                  TAB: MARKET TRENDS & AI PREDICTION
+              ══════════════════════════════════════════════════════════ */}
+              <TabsContent value="trends" className="mt-4 space-y-4">
+                {/* AI Pre-harvest Price Predictions */}
+                <div>
+                  <h3 className="text-sm font-semibold mb-3">🤖 AI Pre-Harvest Price Predictions</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {AI_PREDICTIONS.map(p => (
+                      <Card key={p.crop} className={`border-2 ${p.signal === "SELL NOW" ? "border-primary/40 bg-primary/3" : "border-border"}`}>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-semibold text-sm text-foreground">{p.crop}</span>
+                            <Badge className={`text-[10px] ${p.signal === "SELL NOW" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"}`}>
+                              {p.signal}
+                            </Badge>
+                          </div>
+                          <div className="flex items-end gap-1 mb-2">
+                            <span className="text-2xl font-bold text-primary">₹{p.currentPrice}</span>
+                            <span className="text-xs text-muted-foreground mb-1">/kg now</span>
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Predicted range:</span>
+                              <span className="font-medium text-foreground">₹{p.predictedLow}–₹{p.predictedHigh}/kg</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Best sell window:</span>
+                              <span className="font-medium text-foreground">{p.bestWindow}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-muted-foreground">AI confidence:</span>
+                              <div className="flex items-center gap-1">
+                                <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                                  <div className="h-1.5 bg-primary rounded-full" style={{ width: `${p.confidence}%` }} />
+                                </div>
+                                <span className="font-medium text-primary">{p.confidence}%</span>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 12-week price trend chart */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">12-Week Price Trends (₹/kg)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <LineChart data={PRICE_TREND_12W}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis dataKey="week" tick={{ fontSize: 9 }} interval={2} />
+                        <YAxis tick={{ fontSize: 9 }} unit="₹" />
+                        <Tooltip formatter={(v, n) => [`₹${v}/kg`, n]} />
+                        <Legend wrapperStyle={{ fontSize: 10 }} />
+                        <Line type="monotone" dataKey="tomato" stroke="#ef4444" strokeWidth={2} dot={false} name="Tomato" />
+                        <Line type="monotone" dataKey="onion" stroke="#a78bfa" strokeWidth={2} dot={false} name="Onion" />
+                        <Line type="monotone" dataKey="chilli" stroke="#f97316" strokeWidth={2} dot={false} name="Chilli" />
+                        <Line type="monotone" dataKey="rice" stroke="hsl(var(--primary))" strokeWidth={1.5} dot={false} name="Rice" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+
+                {/* Buyer demand by market */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Buyer Demand by Market</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <BarChart data={BUYER_DEMAND} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis type="number" tick={{ fontSize: 9 }} domain={[0, 100]} unit="%" />
+                        <YAxis dataKey="market" type="category" tick={{ fontSize: 9 }} width={90} />
+                        <Tooltip formatter={(v) => [`${v}%`, "Demand"]} />
+                        <Bar dataKey="demand" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                    <div className="grid grid-cols-3 gap-2 mt-3">
+                      {BUYER_DEMAND.slice(0, 3).map(m => (
+                        <div key={m.market} className="bg-muted/50 rounded-lg p-2 text-center text-xs">
+                          <div className="font-bold text-foreground">{m.buyers}</div>
+                          <div className="text-muted-foreground text-[10px]">Active buyers</div>
+                          <div className="font-medium text-muted-foreground text-[10px] truncate">{m.market}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* ══════════════════════════════════════════════════════════
+                  TAB: NEARBY FARMERS MAP
+              ══════════════════════════════════════════════════════════ */}
+              <TabsContent value="nearby" className="mt-4 space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <h3 className="text-sm font-semibold">Nearby Farmers</h3>
+                    <p className="text-xs text-muted-foreground">Connect, cluster, and trade together</p>
+                  </div>
+                  <div className="flex gap-1 flex-wrap">
+                    {["All", "Tomato", "Onion", "Chilli", "Turmeric", "Rice"].map(c => (
+                      <Button key={c} size="sm" variant={cropFilter === c ? "default" : "outline"}
+                        className={`text-[10px] h-6 px-2 ${cropFilter === c ? "bg-primary" : ""}`}
+                        onClick={() => setCropFilter(c)}>
+                        {c}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Map placeholder (interactive list as fallback) */}
+                <Card className="overflow-hidden border-border">
+                  <div className="bg-muted/40 h-56 relative flex items-center justify-center border-b border-border">
+                    {/* Simulated map background */}
+                    <div className="absolute inset-0 grid grid-cols-8 grid-rows-6 opacity-10">
+                      {Array.from({ length: 48 }).map((_, i) => (
+                        <div key={i} className="border border-primary/40" />
+                      ))}
+                    </div>
+                    {/* Farmer pins */}
+                    {NEARBY_FARMERS
+                      .filter(f => cropFilter === "All" || f.crop === cropFilter)
+                      .map((f, i) => {
+                        const x = 10 + (i * 14) % 80;
+                        const y = 10 + (i * 17) % 70;
+                        const color = CROP_COLORS_MAP[f.crop] || "hsl(var(--primary))";
+                        return (
+                          <button key={f.id}
+                            style={{ left: `${x}%`, top: `${y}%`, borderColor: color }}
+                            className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer group"
+                            onClick={() => setSelectedFarmer(f)}>
+                            <div style={{ backgroundColor: color }}
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-lg border-2 border-white group-hover:scale-125 transition-transform">
+                              {f.name[0]}
+                            </div>
+                            <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-popover border border-border text-foreground text-[9px] px-1.5 py-0.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity shadow-md pointer-events-none">
+                              {f.name} · {f.crop}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    <div className="relative z-10 text-center text-muted-foreground text-xs bg-background/80 px-3 py-1.5 rounded-full border border-border">
+                      🗺️ Warangal District · Click pins to view farmer details
+                    </div>
+                  </div>
+                  <CardContent className="p-3 text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
+                    {Object.entries(CROP_COLORS_MAP).map(([crop, color]) => (
+                      <span key={crop} className="flex items-center gap-1">
+                        <span style={{ backgroundColor: color }} className="w-2.5 h-2.5 rounded-full inline-block" />
+                        {crop}
+                      </span>
+                    ))}
+                  </CardContent>
+                </Card>
+
+                {/* Selected farmer detail */}
+                {selectedFarmer && (
+                  <Card className="border-primary/30 bg-primary/3">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div style={{ backgroundColor: CROP_COLORS_MAP[selectedFarmer.crop] || "hsl(var(--primary))" }}
+                            className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                            {selectedFarmer.name[0]}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-sm text-foreground">{selectedFarmer.name}</div>
+                            <div className="text-xs text-muted-foreground">{selectedFarmer.village}</div>
+                          </div>
+                        </div>
+                        <button className="text-muted-foreground text-xs hover:text-foreground" onClick={() => setSelectedFarmer(null)}>✕</button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div className="bg-muted/50 rounded-lg p-2 text-center">
+                          <div className="font-bold text-foreground">{selectedFarmer.crop}</div>
+                          <div className="text-muted-foreground text-[10px]">Crop</div>
+                        </div>
+                        <div className="bg-muted/50 rounded-lg p-2 text-center">
+                          <div className="font-bold text-foreground">{selectedFarmer.area}</div>
+                          <div className="text-muted-foreground text-[10px]">Farm Area</div>
+                        </div>
+                        <div className="bg-muted/50 rounded-lg p-2 text-center">
+                          <div className="font-bold text-foreground">{selectedFarmer.harvestDate}</div>
+                          <div className="text-muted-foreground text-[10px]">Harvest</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs">
+                        <StarRating rating={selectedFarmer.rating} size="sm" showValue />
+                        <span className="text-muted-foreground">·</span>
+                        <span className="text-muted-foreground">📞 {selectedFarmer.phone}</span>
+                      </div>
+                      {selectedFarmer.tradeGroup && (
+                        <div className="bg-primary/5 border border-primary/20 rounded-lg p-2 text-xs">
+                          🤝 Member of: <span className="font-semibold text-primary">{selectedFarmer.tradeGroup}</span>
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <Button size="sm" className="flex-1 bg-primary text-xs h-7"
+                          onClick={() => toast({ title: `📞 Calling ${selectedFarmer.name}`, description: selectedFarmer.phone })}>
+                          📞 Contact
+                        </Button>
+                        {selectedFarmer.tradeGroup && (
+                          <Button size="sm" variant="outline" className="flex-1 text-xs h-7 border-primary/40 text-primary"
+                            onClick={() => {
+                              const g = selectedFarmer.tradeGroup!;
+                              if (!tradeGroupJoined.includes(g)) {
+                                setTradeGroupJoined(prev => [...prev, g]);
+                                toast({ title: `🤝 Joined ${g}!`, description: "You're now part of this trade cluster." });
+                              }
+                            }}>
+                            {tradeGroupJoined.includes(selectedFarmer.tradeGroup) ? "✅ Joined" : "🤝 Join Cluster"}
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Farmer list */}
+                <div className="space-y-2">
+                  {NEARBY_FARMERS
+                    .filter(f => cropFilter === "All" || f.crop === cropFilter)
+                    .map(f => (
+                      <Card key={f.id}
+                        className={`border cursor-pointer hover:border-primary/40 transition-all ${selectedFarmer?.id === f.id ? "border-primary/50 bg-primary/3" : "border-border"}`}
+                        onClick={() => setSelectedFarmer(f)}>
+                        <CardContent className="p-3 flex items-center gap-3">
+                          <div style={{ backgroundColor: CROP_COLORS_MAP[f.crop] || "hsl(var(--primary))" }}
+                            className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                            {f.name[0]}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-semibold text-foreground">{f.name}</div>
+                            <div className="text-[10px] text-muted-foreground">{f.village} · {f.crop} · {f.area}</div>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className="text-[10px] text-muted-foreground">Harvest: {f.harvestDate}</div>
+                            {f.tradeGroup && (
+                              <Badge className="text-[9px] bg-primary/10 text-primary border border-primary/20 mt-0.5">
+                                🤝 Cluster
+                              </Badge>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                </div>
+
+                {/* Trade clusters summary */}
+                {tradeGroupJoined.length > 0 && (
+                  <Card className="border-primary/30 bg-primary/5">
+                    <CardContent className="p-4">
+                      <div className="text-xs font-semibold text-foreground mb-2">✅ Your Trade Clusters</div>
+                      {tradeGroupJoined.map(g => (
+                        <div key={g} className="flex items-center justify-between text-xs py-1.5 border-b border-border last:border-0">
+                          <span className="text-foreground">🤝 {g}</span>
+                          <Badge className="bg-primary text-primary-foreground text-[9px]">Active</Badge>
+                        </div>
+                      ))}
+                      <p className="text-[10px] text-muted-foreground mt-2">
+                        Clusters enable bulk transport, group negotiation, and joint market listings.
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+
             </Tabs>
           </div>
 
