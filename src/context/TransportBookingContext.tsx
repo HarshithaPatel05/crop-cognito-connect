@@ -27,8 +27,19 @@ export interface TransportBooking {
   counterNote?: string;
   // Which vehicle this booking is targeted to (null = broadcast to all)
   targetVehicleId?: string | null;
+  // Confirmed pickup time set by owner (may differ from requested time if shared)
+  confirmedPickupTime?: string;
   // Timestamps
   createdAt: string;
+}
+
+// ── Pickup conflict: same vehicle, same date, same time slot, 2+ confirmed bookings ─
+export interface PickupConflict {
+  vehicleId: string;
+  date: string;
+  time: string;       // shared confirmed pickup time
+  bookingIds: string[];
+  farmerNames: string[];
 }
 
 // ── Available transport vehicles registry ─────────────────────────────────────
@@ -192,6 +203,7 @@ export const AVAILABLE_VEHICLES: AvailableVehicle[] = [
 
 interface TransportBookingContextValue {
   bookings: TransportBooking[];
+  pickupConflicts: PickupConflict[];
   addBooking: (b: Omit<TransportBooking, "id" | "status" | "createdAt">) => void;
   addBroadcastBookings: (
     base: Omit<TransportBooking, "id" | "status" | "createdAt" | "targetVehicleId">,
@@ -202,6 +214,37 @@ interface TransportBookingContextValue {
   rejectBooking: (id: string) => void;
   farmerAccept: (id: string) => void;
   farmerReject: (id: string) => void;
+  setConfirmedPickupTime: (id: string, time: string) => void;
+}
+
+// ── Helper: detect same-vehicle same-date same-time conflicts ─────────────────
+function computeConflicts(bookings: TransportBooking[]): PickupConflict[] {
+  // Only consider confirmed (farmer-accepted) bookings that have a vehicle
+  const confirmed = bookings.filter(
+    b => (b.status === "farmer-accepted" || b.status === "accepted") && b.targetVehicleId
+  );
+
+  // Group by vehicleId|date|time
+  const groups: Record<string, TransportBooking[]> = {};
+  for (const b of confirmed) {
+    const pickupTime = b.confirmedPickupTime ?? b.time;
+    const key = `${b.targetVehicleId}|${b.date}|${pickupTime}`;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(b);
+  }
+
+  return Object.entries(groups)
+    .filter(([, bks]) => bks.length >= 2)
+    .map(([key, bks]) => {
+      const [vehicleId, date, time] = key.split("|");
+      return {
+        vehicleId,
+        date,
+        time,
+        bookingIds: bks.map(b => b.id),
+        farmerNames: bks.map(b => b.farmerName),
+      };
+    });
 }
 
 const TransportBookingContext = createContext<TransportBookingContextValue | null>(null);
@@ -240,10 +283,47 @@ const SEED: TransportBooking[] = [
     targetVehicleId: null,
     createdAt: new Date().toISOString(),
   },
+  // ── Demo: two confirmed bookings on same vehicle + same time = conflict alert ─
+  {
+    id: "BK-DEMO1",
+    farmerName: "Ramesh Kumar",
+    farmerPhone: "98765 43210",
+    product: "Tomato",
+    weightKg: 1500,
+    pickupLocation: "Warangal",
+    dropLocation: "Hyderabad",
+    date: "2024-10-20",
+    time: "07:00",
+    offeredPrice: 1800,
+    notes: "Demo shared pickup",
+    status: "farmer-accepted",
+    targetVehicleId: "V-001",
+    confirmedPickupTime: "07:00",
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "BK-DEMO2",
+    farmerName: "Sunita Devi",
+    farmerPhone: "91234 56789",
+    product: "Chilli",
+    weightKg: 800,
+    pickupLocation: "Karimnagar",
+    dropLocation: "Hyderabad",
+    date: "2024-10-20",
+    time: "07:00",
+    offeredPrice: 900,
+    notes: "Demo shared pickup — same time as BK-DEMO1",
+    status: "farmer-accepted",
+    targetVehicleId: "V-001",
+    confirmedPickupTime: "07:00",
+    createdAt: new Date().toISOString(),
+  },
 ];
 
 export function TransportBookingProvider({ children }: { children: React.ReactNode }) {
   const [bookings, setBookings] = useState<TransportBooking[]>(SEED);
+
+  const pickupConflicts = computeConflicts(bookings);
 
   const addBooking = (b: Omit<TransportBooking, "id" | "status" | "createdAt">) => {
     const newBooking: TransportBooking = {
@@ -302,9 +382,16 @@ export function TransportBookingProvider({ children }: { children: React.ReactNo
     );
   };
 
+  // Transport owner sets the confirmed pickup time (may be shared across bookings)
+  const setConfirmedPickupTime = (id: string, time: string) => {
+    setBookings((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, confirmedPickupTime: time } : b))
+    );
+  };
+
   return (
     <TransportBookingContext.Provider
-      value={{ bookings, addBooking, addBroadcastBookings, sendCounter, acceptBooking, rejectBooking, farmerAccept, farmerReject }}
+      value={{ bookings, pickupConflicts, addBooking, addBroadcastBookings, sendCounter, acceptBooking, rejectBooking, farmerAccept, farmerReject, setConfirmedPickupTime }}
     >
       {children}
     </TransportBookingContext.Provider>

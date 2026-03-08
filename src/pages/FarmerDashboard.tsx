@@ -80,6 +80,119 @@ const EMPTY_STORAGE: StorageForm = {
   checkInDate: "", checkOutDate: "", notes: "", phone: "",
 };
 
+// ── Helper: get the confirmed pickup time for a booking in a conflict ─────────
+function b_pickupFor(
+  conflict: import("@/context/TransportBookingContext").PickupConflict,
+  myBookings: import("@/context/TransportBookingContext").TransportBooking[]
+): string | undefined {
+  const match = myBookings.find(b => conflict.bookingIds.includes(b.id));
+  return match?.confirmedPickupTime ?? match?.time;
+}
+
+// ── Simulated tracker waypoints (GPS-style) ───────────────────────────────────
+const TRACKER_STAGES = [
+  { key: "depot",     label: "Vehicle at Depot",         icon: "🏠", desc: "Vehicle is being prepared at the origin depot." },
+  { key: "enroute",   label: "En Route to Pickup",        icon: "🛣️", desc: "Driver is heading to your pickup location." },
+  { key: "arrived",   label: "Arrived at Pickup",         icon: "📍", desc: "Vehicle has arrived. Please be ready to load." },
+  { key: "loading",   label: "Loading in Progress",       icon: "📦", desc: "Your produce is being loaded onto the vehicle." },
+  { key: "transit",   label: "In Transit to Market",      icon: "🚚", desc: "Vehicle is on its way to the destination market." },
+  { key: "delivered", label: "Delivered at Destination",  icon: "✅", desc: "Produce delivered successfully." },
+];
+
+function VehicleTracker({
+  booking,
+  vehicle,
+}: {
+  booking: import("@/context/TransportBookingContext").TransportBooking;
+  vehicle: import("@/context/TransportBookingContext").AvailableVehicle;
+}) {
+  // Simulate a realistic stage based on pickup date/time vs now
+  const [stage, setStage] = useState<number>(1); // default: en-route
+
+  // Cycle through stages for demo purposes
+  const handleAdvance = () => setStage(s => Math.min(s + 1, TRACKER_STAGES.length - 1));
+  const handleReset = () => setStage(0);
+
+  const current = TRACKER_STAGES[stage];
+  const isDelivered = stage === TRACKER_STAGES.length - 1;
+
+  return (
+    <div className="bg-muted/30 border border-border rounded-xl p-4 space-y-3 mt-1">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-base">📡</span>
+          <span className="text-xs font-semibold text-foreground">Live Vehicle Tracker</span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${
+            isDelivered ? "bg-primary/10 text-primary border-primary/30" : "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30"
+          }`}>
+            {isDelivered ? "✅ Delivered" : "🟢 Live"}
+          </span>
+        </div>
+        <span className="text-[10px] text-muted-foreground">{vehicle.vehicleNo} · {vehicle.ownerName}</span>
+      </div>
+
+      {/* Stage progress bar */}
+      <div className="flex items-center gap-0.5">
+        {TRACKER_STAGES.map((s, i) => (
+          <div key={s.key} className="flex-1 flex flex-col items-center gap-1">
+            <div className={`h-1.5 w-full rounded-full transition-all duration-300 ${
+              i < stage ? "bg-primary" : i === stage ? "bg-primary/60 animate-pulse" : "bg-muted"
+            }`} />
+            <span className={`text-[9px] hidden sm:block text-center ${i === stage ? "text-primary font-semibold" : "text-muted-foreground"}`}>
+              {s.icon}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Current status */}
+      <div className="flex items-start gap-3 bg-background border border-border rounded-lg p-3">
+        <span className="text-2xl">{current.icon}</span>
+        <div className="flex-1">
+          <div className="text-sm font-semibold text-foreground">{current.label}</div>
+          <div className="text-xs text-muted-foreground">{current.desc}</div>
+          <div className="text-[10px] text-muted-foreground mt-1">
+            📍 {booking.pickupLocation} → 🏪 {booking.dropLocation} · 📞 {vehicle.phone}
+          </div>
+        </div>
+      </div>
+
+      {/* Milestone list */}
+      <div className="space-y-1">
+        {TRACKER_STAGES.map((s, i) => (
+          <div key={s.key} className={`flex items-center gap-2 text-xs transition-opacity ${i > stage ? "opacity-30" : ""}`}>
+            <span className={`w-4 h-4 flex items-center justify-center rounded-full text-[10px] flex-shrink-0 ${
+              i < stage ? "bg-primary text-primary-foreground" :
+              i === stage ? "bg-primary/20 text-primary border border-primary/40" :
+              "bg-muted text-muted-foreground"
+            }`}>
+              {i < stage ? "✓" : i + 1}
+            </span>
+            <span className={i === stage ? "font-semibold text-foreground" : "text-muted-foreground"}>{s.label}</span>
+            {i < stage && <span className="text-[10px] text-primary ml-auto">Done</span>}
+            {i === stage && <span className="text-[10px] text-primary ml-auto animate-pulse">● Now</span>}
+          </div>
+        ))}
+      </div>
+
+      {/* Demo controls */}
+      <div className="flex gap-2 pt-1 border-t border-border">
+        <Button size="sm" variant="outline" className="text-[10px] h-6 px-2 flex-1" onClick={handleReset} disabled={stage === 0}>
+          ↩ Reset
+        </Button>
+        <Button size="sm" className="text-[10px] h-6 px-2 flex-1 bg-primary" onClick={handleAdvance} disabled={isDelivered}>
+          Next Stage →
+        </Button>
+      </div>
+      <p className="text-[10px] text-muted-foreground text-center">
+        Demo: advance stages to simulate vehicle movement. In production, this updates via GPS.
+      </p>
+    </div>
+  );
+}
+
+
 // ── VehicleCard: used in Find Transport tab ───────────────────────────────────
 function VehicleCard({
   v,
@@ -195,7 +308,7 @@ function VehicleCard({
 export default function FarmerDashboard() {
   const { toast } = useToast();
   const { user } = useRole();
-  const { bookings, addBooking, addBroadcastBookings, farmerAccept, farmerReject } = useTransportBooking();
+  const { bookings, pickupConflicts, addBooking, addBroadcastBookings, farmerAccept, farmerReject } = useTransportBooking();
   const { bookings: storageBookings, addBooking: addStorageBooking } = useStorageBooking();
 
   const fp = (user?.profile ?? {}) as FarmerProfile;
@@ -650,8 +763,58 @@ export default function FarmerDashboard() {
                   <Button size="sm" className="bg-primary text-xs h-8" onClick={() => setActiveTab("findtransport")}>
                     + Find &amp; Book Vehicle
                   </Button>
-
                 </div>
+
+                {/* ── Pickup Conflict Alerts ── */}
+                {pickupConflicts
+                  .filter(conflict =>
+                    conflict.farmerNames.includes(farmerName) &&
+                    conflict.bookingIds.some(id => myTransportBookings.find(b => b.id === id))
+                  )
+                  .map(conflict => {
+                    const vehicle = AVAILABLE_VEHICLES.find(v => v.id === conflict.vehicleId);
+                    const otherFarmers = conflict.farmerNames.filter(n => n !== farmerName);
+                    return (
+                      <Card key={`conflict-${conflict.vehicleId}-${conflict.date}-${conflict.time}`}
+                        className="border-2 border-accent/60 bg-accent/5">
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-3">
+                            <span className="text-2xl">⚠️</span>
+                            <div className="flex-1 space-y-1">
+                              <div className="font-semibold text-sm text-foreground">
+                                Shared Pickup Schedule Notice
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                <span className="font-medium text-foreground">{vehicle?.ownerName ?? "The transport owner"}</span>
+                                {" "}({vehicle?.vehicleNo}) has scheduled your pickup along with{" "}
+                                <span className="font-medium text-foreground">{otherFarmers.join(", ")}</span>
+                                {" "}on the same trip.
+                              </p>
+                              <div className="flex items-center gap-3 mt-2 flex-wrap">
+                                <span className="inline-flex items-center gap-1.5 bg-accent/10 border border-accent/30 text-foreground rounded-full px-3 py-1 text-xs font-semibold">
+                                  📅 {conflict.date}
+                                </span>
+                                <span className="inline-flex items-center gap-1.5 bg-accent/10 border border-accent/30 text-foreground rounded-full px-3 py-1 text-xs font-semibold">
+                                  🕐 Pickup at {conflict.time}
+                                </span>
+                                {vehicle && (
+                                  <span className="inline-flex items-center gap-1.5 bg-muted text-muted-foreground rounded-full px-3 py-1 text-xs">
+                                    🚛 {vehicle.vehicleType}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Please be ready at <span className="font-semibold text-foreground">{b_pickupFor(conflict, myTransportBookings) ?? conflict.time}</span>{" "}
+                                — the vehicle will service multiple pickups on this route. Contact{" "}
+                                {vehicle ? <span className="font-medium text-foreground">{vehicle.ownerName} ({vehicle.phone})</span> : "the owner"} for any queries.
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })
+                }
 
                 {myTransportBookings.length === 0 && (
                   <Card className="border-dashed border-border">
@@ -673,6 +836,9 @@ export default function FarmerDashboard() {
                   const vehicleInfo = b.targetVehicleId
                     ? AVAILABLE_VEHICLES.find(v => v.id === b.targetVehicleId)
                     : null;
+                  const confirmedTime = b.confirmedPickupTime ?? b.time;
+                  // Is this booking part of a conflict?
+                  const conflict = pickupConflicts.find(c => c.bookingIds.includes(b.id));
 
                   return (
                     <Card key={b.id} className={`border-2 transition-all ${
@@ -695,8 +861,13 @@ export default function FarmerDashboard() {
                             {!b.targetVehicleId && (
                               <Badge variant="outline" className="text-[10px] text-muted-foreground">📡 Broadcast</Badge>
                             )}
+                            {conflict && (
+                              <Badge className="text-[10px] bg-accent/20 text-foreground border border-accent/40">
+                                ⚠️ Shared Trip
+                              </Badge>
+                            )}
                           </div>
-                          <span className="text-xs text-muted-foreground">{b.date} · {b.time}</span>
+                          <span className="text-xs text-muted-foreground">{b.date} · {confirmedTime}</span>
                         </div>
 
                         {isConfirmed && (
@@ -732,6 +903,11 @@ export default function FarmerDashboard() {
                             <span>·</span>
                             <span>📞 {vehicleInfo.phone}</span>
                           </div>
+                        )}
+
+                        {/* ── Live Vehicle Tracker (confirmed bookings only) ── */}
+                        {isConfirmed && vehicleInfo && (
+                          <VehicleTracker booking={b} vehicle={vehicleInfo} />
                         )}
 
                         {isCounter && b.counterNote && (
