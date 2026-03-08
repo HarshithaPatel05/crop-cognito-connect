@@ -17,6 +17,45 @@ const QUICK_PROMPTS: Record<Language, string[]> = {
   hi: ["टमाटर कब बेचें?", "भाड़ा दर क्या है?", "अभी बेचें या रखें?"],
 };
 
+// Play audio from ElevenLabs TTS edge function — falls back to browser TTS on error
+async function playElevenLabsTTS(
+  text: string,
+  supabaseUrl: string,
+  publishableKey: string,
+  onStart: () => void,
+  onEnd: () => void,
+  onError: (msg: string) => void
+): Promise<HTMLAudioElement | null> {
+  onStart();
+  try {
+    const resp = await fetch(`${supabaseUrl}/functions/v1/elevenlabs-tts`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: publishableKey,
+        Authorization: `Bearer ${publishableKey}`,
+      },
+      body: JSON.stringify({ text }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || `TTS error ${resp.status}`);
+    }
+
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    audio.onended = () => { URL.revokeObjectURL(url); onEnd(); };
+    audio.onerror = () => { URL.revokeObjectURL(url); onError("Audio playback failed"); };
+    await audio.play();
+    return audio;
+  } catch (e) {
+    onError(e instanceof Error ? e.message : "TTS failed");
+    return null;
+  }
+}
+
 // Stream SSE response from edge function
 async function streamCopilot({
   messages,
@@ -90,12 +129,15 @@ export function AICopilot() {
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
   const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
+  const [ttsLoading, setTtsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const { toast } = useToast();
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+  const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 
   // Greeting on open
   useEffect(() => {
@@ -161,27 +203,41 @@ export function AICopilot() {
     });
   };
 
-  const speak = (text: string, idx: number) => {
-    if (!window.speechSynthesis) {
-      toast({ title: "Not supported", description: "Text-to-speech not supported on this browser." });
-      return;
-    }
-    // If already speaking this message, stop it
+  const speak = async (text: string, idx: number) => {
+    // Stop if already speaking this message
     if (speakingIdx === idx) {
-      window.speechSynthesis.cancel();
+      audioRef.current?.pause();
+      audioRef.current = null;
       setSpeakingIdx(null);
+      setTtsLoading(false);
       return;
     }
-    window.speechSynthesis.cancel();
-    // Strip markdown-like symbols for cleaner speech
-    const clean = text.replace(/[*_`#~>]/g, "").replace(/\n+/g, " ");
-    const utterance = new SpeechSynthesisUtterance(clean);
-    utterance.lang = lang === "te" ? "te-IN" : lang === "hi" ? "hi-IN" : "en-IN";
-    utterance.rate = 0.92;
-    utterance.onstart = () => setSpeakingIdx(idx);
-    utterance.onend = () => setSpeakingIdx(null);
-    utterance.onerror = () => setSpeakingIdx(null);
-    window.speechSynthesis.speak(utterance);
+    // Stop any currently playing audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+      setSpeakingIdx(null);
+    }
+
+    const audio = await playElevenLabsTTS(
+      text,
+      supabaseUrl,
+      publishableKey,
+      () => { setTtsLoading(true); },
+      () => { setSpeakingIdx(idx); setTtsLoading(false); audioRef.current = null; setSpeakingIdx(null); },
+      (err) => {
+        setTtsLoading(false);
+        setSpeakingIdx(null);
+        toast({ variant: "destructive", title: "Read aloud failed", description: err });
+      },
+    );
+
+    if (audio) {
+      audioRef.current = audio;
+      // onStart fires before play, but we need to update speakingIdx after audio is returned
+      setSpeakingIdx(idx);
+      setTtsLoading(false);
+    }
   };
 
   const toggleVoice = () => {
@@ -264,7 +320,7 @@ export function AICopilot() {
               variant="ghost"
               size="icon"
               className="h-7 w-7 text-primary-foreground hover:bg-primary/60 flex-shrink-0"
-              onClick={() => { window.speechSynthesis?.cancel(); setSpeakingIdx(null); setOpen(false); }}
+              onClick={() => { audioRef.current?.pause(); audioRef.current = null; setSpeakingIdx(null); setTtsLoading(false); setOpen(false); }}
             >
               <X className="w-4 h-4" />
             </Button>
@@ -289,14 +345,19 @@ export function AICopilot() {
                   {msg.role === "assistant" && (
                     <button
                       onClick={() => speak(msg.content, i)}
-                      title={speakingIdx === i ? "Stop reading" : "Read aloud"}
-                      className={`mt-1.5 flex items-center gap-1 text-[10px] transition-colors ${
+                      disabled={ttsLoading && speakingIdx !== i}
+                      title={speakingIdx === i ? "Stop reading" : "Read aloud (ElevenLabs AI voice)"}
+                      className={`mt-1.5 flex items-center gap-1 text-[10px] transition-colors disabled:opacity-40 ${
                         speakingIdx === i
                           ? "text-primary font-medium"
+                          : ttsLoading && speakingIdx === null
+                          ? "text-muted-foreground"
                           : "text-muted-foreground hover:text-primary"
                       }`}
                     >
-                      {speakingIdx === i
+                      {ttsLoading && speakingIdx === null && i === messages.length - 1
+                        ? <><Loader2 className="w-3 h-3 animate-spin" /> Loading voice…</>
+                        : speakingIdx === i
                         ? <><VolumeX className="w-3 h-3" /> Stop</>
                         : <><Volume2 className="w-3 h-3" /> Read aloud</>
                       }
