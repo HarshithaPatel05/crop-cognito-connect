@@ -49,7 +49,19 @@ const STATIC_INVENTORY = [
 
 export default function StorageDashboard() {
   const { toast } = useToast();
+  const { user } = useRole();
   const { bookings, approveBooking, rejectBooking, completeBooking } = useStorageBooking();
+
+  const sp = (user?.profile ?? {}) as StorageProfile;
+  const managerName   = user?.name ?? "CoolStore Facilities";
+  const facilityName  = sp.warehouseName ?? "My Storage Facility";
+  const storageCapTon = parseFloat(sp.storageCapacity ?? "200");
+  const storageType   = sp.storageTypes ?? "Cold Storage";
+  const tempRange     = sp.tempRange ?? "4–10°C";
+  const fssaiNo       = sp.fssaiNo ?? "";
+  const unitsCount    = sp.unitsAvailable ?? "4";
+  const ratePerTonDay = sp.pricePerTonDay ?? "25";
+  const insured       = sp.insuranceCovered ?? "No";
 
   const [managerNotes, setManagerNotes] = useState<Record<string, string>>({});
 

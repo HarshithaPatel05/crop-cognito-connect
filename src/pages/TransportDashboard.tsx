@@ -486,7 +486,7 @@ export default function TransportDashboard() {
   };
 
   return (
-    <AppLayout title="Transport Owner Dashboard" subtitle="Manage your vehicle, bookings & earnings">
+    <AppLayout title="Transport Owner Dashboard" subtitle={`${ownerName} · ${vNo} · ${vType}${isRefrig ? " · ❄️ Refrigerated" : ""}`}>
       <div className="space-y-6 animate-fade-in">
 
         {/* ── Top KPIs ── */}
