@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,16 +8,17 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AIRecommendationBox } from "@/components/shared/AIRecommendationBox";
 import { WeatherWidget } from "@/components/shared/WeatherWidget";
 import { HarvestReadinessScore } from "@/components/shared/HarvestReadinessScore";
 import { SpoilageRiskMeter } from "@/components/shared/SpoilageRiskMeter";
 import { StatCard } from "@/components/shared/StatCard";
 import { VoiceAssistant } from "@/components/shared/VoiceAssistant";
+import { StarRating } from "@/components/shared/StarRating";
 import { AI_RECOMMENDATIONS, STORAGE_UNITS } from "@/data/mockData";
 import { useToast } from "@/hooks/use-toast";
-import { useTransportBooking } from "@/context/TransportBookingContext";
+import { useTransportBooking, AVAILABLE_VEHICLES, AvailableVehicle } from "@/context/TransportBookingContext";
 import { useStorageBooking, StorageType } from "@/context/StorageBookingContext";
 import { useRole, FarmerProfile } from "@/context/RoleContext";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
@@ -29,7 +30,7 @@ const PRICE_HISTORY = [
 
 const QUICK_ACTIONS = [
   { icon: "📋", label: "List Crop for Sale" },
-  { icon: "🚚", label: "Request Transport" },
+  { icon: "🚚", label: "Find Transport" },
   { icon: "💰", label: "Apply for Loan" },
   { icon: "📸", label: "Upload Crop Image" },
   { icon: "🏪", label: "Book Storage" },
@@ -39,10 +40,10 @@ const QUICK_ACTIONS = [
 const STATUS_META: Record<string, { label: string; color: string }> = {
   pending:          { label: "⏳ Pending",          color: "bg-muted text-muted-foreground" },
   "counter-sent":   { label: "💬 Counter Received", color: "bg-accent/20 text-foreground border-accent/40" },
-  accepted:         { label: "✅ Accepted",          color: "bg-primary/10 text-primary border-primary/30" },
+  accepted:         { label: "✅ Owner Accepted",    color: "bg-primary/10 text-primary border-primary/30" },
   rejected:         { label: "❌ Rejected",          color: "bg-destructive/10 text-destructive border-destructive/30" },
-  "farmer-accepted":{ label: "🎉 Trip Confirmed",   color: "bg-primary/10 text-primary border-primary/30" },
-  "farmer-rejected":{ label: "✗ You Declined",      color: "bg-destructive/10 text-destructive border-destructive/30" },
+  "farmer-accepted":{ label: "🎉 CONFIRMED",         color: "bg-primary/10 text-primary border-primary/30" },
+  "farmer-rejected":{ label: "✗ You Declined",       color: "bg-destructive/10 text-destructive border-destructive/30" },
 };
 
 const STORAGE_STATUS_META: Record<string, { label: string; color: string }> = {
@@ -79,10 +80,122 @@ const EMPTY_STORAGE: StorageForm = {
   checkInDate: "", checkOutDate: "", notes: "", phone: "",
 };
 
+// ── VehicleCard: used in Find Transport tab ───────────────────────────────────
+function VehicleCard({
+  v,
+  onBook,
+  onBroadcast,
+  selected,
+  onToggleSelect,
+}: {
+  v: AvailableVehicle;
+  onBook: (v: AvailableVehicle) => void;
+  onBroadcast: (v: AvailableVehicle) => void;
+  selected: boolean;
+  onToggleSelect: (id: string) => void;
+}) {
+  const freeTon = v.capacityTon - v.currentLoadTon;
+  const usedPct = Math.round((v.currentLoadTon / v.capacityTon) * 100);
+  const loadColor = usedPct >= 80 ? "bg-destructive" : usedPct >= 50 ? "bg-yellow-500" : "bg-primary";
+  const loadTextColor = usedPct >= 80 ? "text-destructive" : usedPct >= 50 ? "text-yellow-600" : "text-primary";
+
+  return (
+    <Card className={`border-2 transition-all duration-200 cursor-pointer ${selected ? "border-primary bg-primary/5 shadow-md" : "border-border hover:border-primary/40"}`}>
+      <CardContent className="p-4 space-y-3">
+        {/* Header row */}
+        <div className="flex items-start justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <div
+              className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${selected ? "bg-primary border-primary" : "border-muted-foreground/40"}`}
+              onClick={() => onToggleSelect(v.id)}
+            >
+              {selected && <span className="text-primary-foreground text-xs font-bold">✓</span>}
+            </div>
+            <div>
+              <div className="font-semibold text-sm text-foreground">{v.ownerName}</div>
+              <div className="text-[10px] text-muted-foreground">{v.vehicleNo} · {v.location}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {v.isRefrigerated && (
+              <Badge className="text-[10px] bg-primary/10 text-primary border border-primary/30">❄️ Refrigerated</Badge>
+            )}
+            <Badge variant="outline" className="text-[10px]">{v.vehicleType}</Badge>
+          </div>
+        </div>
+
+        {/* Capacity bar */}
+        <div className="space-y-1">
+          <div className="flex justify-between text-[10px] text-muted-foreground">
+            <span>Current Load</span>
+            <span className={`font-semibold ${loadTextColor}`}>{usedPct}% full · {freeTon.toFixed(1)}T free</span>
+          </div>
+          <div className="h-2 bg-muted rounded-full overflow-hidden">
+            <div className={`h-2 rounded-full ${loadColor}`} style={{ width: `${usedPct}%` }} />
+          </div>
+          <div className="text-[10px] text-muted-foreground">{v.currentLoadTon}T booked / {v.capacityTon}T total capacity</div>
+        </div>
+
+        {/* Stats grid */}
+        <div className="grid grid-cols-3 gap-2 text-xs">
+          <div className="bg-muted/50 rounded-lg p-2 text-center">
+            <div className="font-bold text-foreground">₹{v.pricePerKm}/km</div>
+            <div className="text-[10px] text-muted-foreground">Per KM</div>
+          </div>
+          <div className="bg-muted/50 rounded-lg p-2 text-center">
+            <div className="font-bold text-foreground">₹{v.pricePerTon}/T</div>
+            <div className="text-[10px] text-muted-foreground">Per Ton</div>
+          </div>
+          <div className="bg-muted/50 rounded-lg p-2 text-center">
+            <div className="font-bold text-foreground">{v.onTimeRate}%</div>
+            <div className="text-[10px] text-muted-foreground">On-Time</div>
+          </div>
+        </div>
+
+        {/* Rating + trips */}
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <StarRating rating={v.rating} size="sm" showValue />
+            <span className="text-[10px] text-muted-foreground">{v.totalTrips} trips</span>
+          </div>
+          <div className="text-[10px] text-muted-foreground">⛽ {v.fuelType}</div>
+        </div>
+
+        {/* Routes */}
+        <div className="flex flex-wrap gap-1">
+          {v.routes.map(r => (
+            <span key={r} className="text-[10px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground">{r}</span>
+          ))}
+        </div>
+
+        {/* Features */}
+        <div className="flex flex-wrap gap-1">
+          {v.features.map(f => (
+            <span key={f} className="text-[10px] bg-primary/5 px-1.5 py-0.5 rounded-full text-primary border border-primary/20">{f}</span>
+          ))}
+        </div>
+
+        {/* Availability */}
+        <div className="text-[10px] text-muted-foreground">🕐 Available: {v.availableFrom} – {v.availableTo} · Min load: {v.minLoadKg}kg</div>
+
+        {/* Action buttons */}
+        <div className="flex gap-2 pt-1">
+          <Button size="sm" className="flex-1 bg-primary text-xs h-8" onClick={() => onBook(v)}>
+            📝 Request This Vehicle
+          </Button>
+          <Button size="sm" variant="outline" className="text-xs h-8 border-border" onClick={() => onBroadcast(v)}>
+            📡 Broadcast
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function FarmerDashboard() {
   const { toast } = useToast();
   const { user } = useRole();
-  const { bookings, addBooking, farmerAccept, farmerReject } = useTransportBooking();
+  const { bookings, addBooking, addBroadcastBookings, farmerAccept, farmerReject } = useTransportBooking();
   const { bookings: storageBookings, addBooking: addStorageBooking } = useStorageBooking();
 
   const fp = (user?.profile ?? {}) as FarmerProfile;
@@ -108,6 +221,18 @@ export default function FarmerDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [smsCmd, setSmsCmd] = useState("");
 
+  // ── Find Transport state ────────────────────────────────────────────────────
+  // null = no dialog, "targeted" = booking one vehicle, "broadcast" = broadcasting to all selected
+  const [vehicleBookingMode, setVehicleBookingMode] = useState<null | "targeted" | "broadcast">(null);
+  const [targetVehicle, setTargetVehicle] = useState<AvailableVehicle | null>(null);
+  const [selectedVehicleIds, setSelectedVehicleIds] = useState<string[]>([]);
+  const [vehicleFilter, setVehicleFilter] = useState<"all" | "refrigerated" | "available">("all");
+  const [vehicleForm, setVehicleForm] = useState<TransportForm>({
+    ...EMPTY_TRANSPORT,
+    product: primaryCrop,
+    pickupLocation: farmerLocation.split(",")[0].trim(),
+  });
+
   const [farmData] = useState({
     name: farmerName, village: farmerLocation.split(",")[0].trim(),
     crop: primaryCrop, variety: "Hybrid F1",
@@ -119,13 +244,15 @@ export default function FarmerDashboard() {
 
   const pendingCounter = myTransportBookings.filter(b => b.status === "counter-sent").length;
   const pendingStorage = myStorageBookings.filter(b => b.status === "pending").length;
-  const totalBadges = pendingCounter + pendingStorage;
 
   const setTF = (key: keyof TransportForm, val: string) =>
     setTransportForm(p => ({ ...p, [key]: val }));
 
   const setSF = (key: keyof StorageForm, val: string) =>
     setStorageForm(p => ({ ...p, [key]: val }));
+
+  const setVF = (key: keyof TransportForm, val: string) =>
+    setVehicleForm(p => ({ ...p, [key]: val }));
 
   // ── Derived storage form calculations ──────────────────────────────────────
   const selectedUnit = STORAGE_UNITS.find(u => String(u.id) === storageForm.unitId);
@@ -137,6 +264,15 @@ export default function FarmerDashboard() {
     ? Math.round(Number(storageForm.weightKg) * selectedUnit.price * durationMonths)
     : 0;
 
+  // ── Filtered vehicles ───────────────────────────────────────────────────────
+  const filteredVehicles = useMemo(() => {
+    return AVAILABLE_VEHICLES.filter(v => {
+      if (vehicleFilter === "refrigerated") return v.isRefrigerated;
+      if (vehicleFilter === "available") return (v.capacityTon - v.currentLoadTon) > 0.5;
+      return true;
+    });
+  }, [vehicleFilter]);
+
   const handleSMS = () => {
     if (!smsCmd.trim()) return;
     toast({ title: "SMS Command Processed ✅", description: `Data updated from: "${smsCmd}"` });
@@ -144,9 +280,82 @@ export default function FarmerDashboard() {
   };
 
   const handleAction = (label: string) => {
-    if (label === "Request Transport") { setShowTransportDialog(true); return; }
+    if (label === "Find Transport") { setActiveTab("findtransport"); return; }
     if (label === "Book Storage") { setShowStorageDialog(true); return; }
     toast({ title: label, description: "Feature initiated successfully" });
+  };
+
+  const handleToggleVehicleSelect = (id: string) => {
+    setSelectedVehicleIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleOpenTargeted = (v: AvailableVehicle) => {
+    setTargetVehicle(v);
+    setVehicleForm({ ...EMPTY_TRANSPORT, product: primaryCrop, pickupLocation: farmData.village, phone: user?.phone ?? "" });
+    setVehicleBookingMode("targeted");
+  };
+
+  const handleOpenBroadcast = (v?: AvailableVehicle) => {
+    // If triggered from a specific vehicle card, pre-select it
+    if (v && !selectedVehicleIds.includes(v.id)) {
+      setSelectedVehicleIds(prev => [...prev, v.id]);
+    }
+    setVehicleForm({ ...EMPTY_TRANSPORT, product: primaryCrop, pickupLocation: farmData.village, phone: user?.phone ?? "" });
+    setVehicleBookingMode("broadcast");
+  };
+
+  const validateVehicleForm = (form: TransportForm) => {
+    const product = form.product === "Other" ? form.customProduct : form.product;
+    if (!product || !form.weightKg || !form.pickupLocation || !form.dropLocation || !form.date || !form.time || !form.offeredPrice || !form.phone) {
+      toast({ title: "Please fill all required fields", variant: "destructive" });
+      return false;
+    }
+    return true;
+  };
+
+  const handleSubmitTargetedVehicle = () => {
+    if (!targetVehicle || !validateVehicleForm(vehicleForm)) return;
+    const product = vehicleForm.product === "Other" ? vehicleForm.customProduct : vehicleForm.product;
+    addBooking({
+      farmerName, farmerPhone: vehicleForm.phone,
+      product, weightKg: Number(vehicleForm.weightKg),
+      pickupLocation: vehicleForm.pickupLocation, dropLocation: vehicleForm.dropLocation,
+      date: vehicleForm.date, time: vehicleForm.time,
+      offeredPrice: Number(vehicleForm.offeredPrice), notes: vehicleForm.notes,
+      targetVehicleId: targetVehicle.id,
+    });
+    toast({
+      title: `🚚 Request Sent to ${targetVehicle.ownerName}!`,
+      description: `Booking request submitted. You'll be notified when they respond.`,
+    });
+    setVehicleBookingMode(null);
+    setTargetVehicle(null);
+    setActiveTab("transport");
+  };
+
+  const handleSubmitBroadcast = () => {
+    if (!validateVehicleForm(vehicleForm)) return;
+    const ids = selectedVehicleIds.length > 0 ? selectedVehicleIds : AVAILABLE_VEHICLES.map(v => v.id);
+    const product = vehicleForm.product === "Other" ? vehicleForm.customProduct : vehicleForm.product;
+    addBroadcastBookings(
+      {
+        farmerName, farmerPhone: vehicleForm.phone,
+        product, weightKg: Number(vehicleForm.weightKg),
+        pickupLocation: vehicleForm.pickupLocation, dropLocation: vehicleForm.dropLocation,
+        date: vehicleForm.date, time: vehicleForm.time,
+        offeredPrice: Number(vehicleForm.offeredPrice), notes: vehicleForm.notes,
+      },
+      ids
+    );
+    toast({
+      title: `📡 Broadcast Sent to ${ids.length} Vehicle${ids.length > 1 ? "s" : ""}!`,
+      description: "You'll be notified as each owner responds. First to accept wins the trip.",
+    });
+    setVehicleBookingMode(null);
+    setSelectedVehicleIds([]);
+    setActiveTab("transport");
   };
 
   const handleSubmitTransport = () => {
@@ -253,8 +462,9 @@ export default function FarmerDashboard() {
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="bg-muted flex-wrap h-auto gap-1">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="findtransport">🔍 Find Transport</TabsTrigger>
                 <TabsTrigger value="transport" className="relative">
-                  🚚 Transport
+                  🚚 My Bookings
                   {pendingCounter > 0 && (
                     <span className="absolute -top-1 -right-1 bg-accent text-foreground text-[9px] font-bold rounded-full px-1 leading-4 min-w-[16px] text-center">
                       {pendingCounter}
@@ -363,13 +573,84 @@ export default function FarmerDashboard() {
                 </Card>
               </TabsContent>
 
+              {/* ══════════════════════════════════════════════════════════
+                  TAB: FIND TRANSPORT
+              ══════════════════════════════════════════════════════════ */}
+              <TabsContent value="findtransport" className="mt-4 space-y-4">
+
+                {/* Header + controls */}
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold">Available Transport Vehicles</h3>
+                    <p className="text-xs text-muted-foreground">Browse vehicles, check capacity &amp; ratings, then book or broadcast</p>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    {(["all", "refrigerated", "available"] as const).map(f => (
+                      <Button key={f} size="sm" variant={vehicleFilter === f ? "default" : "outline"}
+                        className={`text-xs h-7 capitalize ${vehicleFilter === f ? "bg-primary" : ""}`}
+                        onClick={() => setVehicleFilter(f)}>
+                        {f === "all" ? "All" : f === "refrigerated" ? "❄️ Refrigerated" : "✅ Has Space"}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Broadcast-all banner when vehicles are selected */}
+                {selectedVehicleIds.length > 0 && (
+                  <Card className="border-primary/30 bg-primary/5">
+                    <CardContent className="p-3 flex items-center justify-between gap-3 flex-wrap">
+                      <div className="text-sm font-medium text-foreground">
+                        📡 <span className="text-primary font-bold">{selectedVehicleIds.length}</span> vehicle{selectedVehicleIds.length > 1 ? "s" : ""} selected for broadcast
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" className="text-xs h-7 border-destructive/50 text-destructive"
+                          onClick={() => setSelectedVehicleIds([])}>Clear</Button>
+                        <Button size="sm" className="bg-primary text-xs h-7"
+                          onClick={() => handleOpenBroadcast()}>
+                          📡 Send Broadcast Request
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Broadcast to ALL button */}
+                <Card className="border-dashed border-primary/30">
+                  <CardContent className="p-4 flex items-center justify-between flex-wrap gap-3">
+                    <div>
+                      <div className="font-semibold text-sm text-foreground">📡 Broadcast to All Vehicles</div>
+                      <div className="text-xs text-muted-foreground">Enter your details once — request sent to all {AVAILABLE_VEHICLES.length} available vehicles simultaneously</div>
+                    </div>
+                    <Button size="sm" className="bg-primary text-xs h-8"
+                      onClick={() => { setSelectedVehicleIds(AVAILABLE_VEHICLES.map(v => v.id)); handleOpenBroadcast(); }}>
+                      🚀 Broadcast to All ({AVAILABLE_VEHICLES.length})
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Vehicle grid */}
+                <div className="grid grid-cols-1 gap-4">
+                  {filteredVehicles.map(v => (
+                    <VehicleCard
+                      key={v.id}
+                      v={v}
+                      onBook={handleOpenTargeted}
+                      onBroadcast={handleOpenBroadcast}
+                      selected={selectedVehicleIds.includes(v.id)}
+                      onToggleSelect={handleToggleVehicleSelect}
+                    />
+                  ))}
+                </div>
+              </TabsContent>
+
               {/* ── Transport Bookings ── */}
               <TabsContent value="transport" className="mt-4 space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold">My Transport Bookings</h3>
-                  <Button size="sm" className="bg-primary text-xs h-8" onClick={() => setShowTransportDialog(true)}>
-                    + New Booking
+                  <Button size="sm" className="bg-primary text-xs h-8" onClick={() => setActiveTab("findtransport")}>
+                    + Find &amp; Book Vehicle
                   </Button>
+
                 </div>
 
                 {myTransportBookings.length === 0 && (
@@ -377,8 +658,8 @@ export default function FarmerDashboard() {
                     <CardContent className="py-12 text-center text-muted-foreground text-sm">
                       <div className="text-4xl mb-3">🚚</div>
                       <p>No transport bookings yet.</p>
-                      <Button size="sm" className="mt-4 bg-primary" onClick={() => setShowTransportDialog(true)}>
-                        Book Transport Now
+                      <Button size="sm" className="mt-4 bg-primary" onClick={() => setActiveTab("findtransport")}>
+                        Find a Vehicle
                       </Button>
                     </CardContent>
                   </Card>
@@ -387,22 +668,43 @@ export default function FarmerDashboard() {
                 {myTransportBookings.map((b) => {
                   const meta = STATUS_META[b.status] || STATUS_META["pending"];
                   const isCounter = b.status === "counter-sent";
+                  const isAccepted = b.status === "accepted";
+                  const isConfirmed = b.status === "farmer-accepted";
+                  const vehicleInfo = b.targetVehicleId
+                    ? AVAILABLE_VEHICLES.find(v => v.id === b.targetVehicleId)
+                    : null;
 
                   return (
                     <Card key={b.id} className={`border-2 transition-all ${
-                      isCounter ? "border-accent/50 bg-accent/5"
-                      : b.status === "farmer-accepted" ? "border-primary/40 bg-primary/5"
+                      isConfirmed ? "border-primary bg-primary/5 shadow-md"
+                      : isCounter ? "border-accent/50 bg-accent/5"
+                      : isAccepted ? "border-primary/40 bg-primary/5"
                       : b.status === "rejected" || b.status === "farmer-rejected" ? "border-destructive/30 opacity-70"
                       : "border-border"
                     }`}>
                       <CardContent className="p-4 space-y-3">
                         <div className="flex items-center justify-between flex-wrap gap-2">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-mono text-xs text-muted-foreground">{b.id}</span>
-                            <Badge variant="outline" className={`text-xs ${meta.color}`}>{meta.label}</Badge>
+                            <Badge variant="outline" className={`text-xs font-semibold ${meta.color}`}>{meta.label}</Badge>
+                            {vehicleInfo && (
+                              <Badge variant="outline" className="text-xs border-secondary/40 text-secondary">
+                                🚛 {vehicleInfo.ownerName}
+                              </Badge>
+                            )}
+                            {!b.targetVehicleId && (
+                              <Badge variant="outline" className="text-[10px] text-muted-foreground">📡 Broadcast</Badge>
+                            )}
                           </div>
                           <span className="text-xs text-muted-foreground">{b.date} · {b.time}</span>
                         </div>
+
+                        {isConfirmed && (
+                          <div className="bg-primary/10 border border-primary/30 rounded-lg px-3 py-2 text-xs text-primary font-semibold text-center">
+                            🎉 TRIP CONFIRMED — Both you and the transport owner have agreed!
+                          </div>
+                        )}
+
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs">
                           <div><span className="text-muted-foreground">Product</span><br /><span className="font-medium">{b.product}</span></div>
                           <div><span className="text-muted-foreground">Load</span><br /><span className="font-medium">{b.weightKg >= 1000 ? `${b.weightKg / 1000}T` : `${b.weightKg}kg`}</span></div>
@@ -412,7 +714,26 @@ export default function FarmerDashboard() {
                           {b.counterPrice && (
                             <div><span className="text-muted-foreground">Counter Price</span><br /><span className="font-semibold">₹{b.counterPrice}</span></div>
                           )}
+                          {vehicleInfo && (
+                            <div><span className="text-muted-foreground">Vehicle</span><br /><span className="font-medium">{vehicleInfo.vehicleNo}</span></div>
+                          )}
+                          {vehicleInfo && (
+                            <div><span className="text-muted-foreground">Capacity</span><br /><span className="font-medium">{vehicleInfo.capacityTon}T</span></div>
+                          )}
                         </div>
+
+                        {vehicleInfo && !isConfirmed && b.status !== "rejected" && b.status !== "farmer-rejected" && (
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2">
+                            <StarRating rating={vehicleInfo.rating} size="sm" showValue />
+                            <span>·</span>
+                            <span>{vehicleInfo.totalTrips} trips</span>
+                            <span>·</span>
+                            <span>{vehicleInfo.onTimeRate}% on-time</span>
+                            <span>·</span>
+                            <span>📞 {vehicleInfo.phone}</span>
+                          </div>
+                        )}
+
                         {isCounter && b.counterNote && (
                           <div className="bg-accent/10 rounded-lg px-3 py-2 text-xs text-foreground border border-accent/30">
                             💬 Transport owner's note: <span className="font-medium">{b.counterNote}</span>
@@ -421,10 +742,10 @@ export default function FarmerDashboard() {
                         {isCounter && (
                           <div className="pt-2 border-t border-border flex gap-2 flex-wrap items-center">
                             <p className="text-xs text-muted-foreground flex-1">
-                              Transport owner wants <span className="font-semibold text-foreground">₹{b.counterPrice}</span> (you offered ₹{b.offeredPrice})
+                              Owner wants <span className="font-semibold text-foreground">₹{b.counterPrice}</span> (you offered ₹{b.offeredPrice})
                             </p>
                             <Button size="sm" className="bg-primary text-xs h-8"
-                              onClick={() => { farmerAccept(b.id); toast({ title: "✅ Counter accepted!", description: `Trip confirmed for ₹${b.counterPrice}` }); }}>
+                              onClick={() => { farmerAccept(b.id); toast({ title: "✅ Counter accepted! Trip Confirmed 🎉", description: `Confirmed at ₹${b.counterPrice}` }); }}>
                               ✅ Accept ₹{b.counterPrice}
                             </Button>
                             <Button size="sm" variant="outline" className="text-xs h-8 border-destructive/50 text-destructive"
@@ -433,9 +754,24 @@ export default function FarmerDashboard() {
                             </Button>
                           </div>
                         )}
-                        {b.status === "farmer-accepted" && (
+                        {isAccepted && !isConfirmed && (
+                          <div className="pt-2 border-t border-border flex gap-2 flex-wrap items-center">
+                            <p className="text-xs text-muted-foreground flex-1">
+                              Owner accepted at your price <span className="font-semibold text-foreground">₹{b.offeredPrice}</span> — confirm to finalise?
+                            </p>
+                            <Button size="sm" className="bg-primary text-xs h-8"
+                              onClick={() => { farmerAccept(b.id); toast({ title: "🎉 Trip Confirmed!", description: "Both parties agreed — trip is confirmed!" }); }}>
+                              ✅ Confirm Trip
+                            </Button>
+                            <Button size="sm" variant="outline" className="text-xs h-8 border-destructive/50 text-destructive"
+                              onClick={() => { farmerReject(b.id); toast({ title: "Trip cancelled", variant: "destructive" }); }}>
+                              Cancel
+                            </Button>
+                          </div>
+                        )}
+                        {isConfirmed && (
                           <div className="text-xs text-primary font-medium pt-1 border-t border-primary/20">
-                            🎉 Trip confirmed at ₹{b.counterPrice || b.offeredPrice} — transport owner will contact you soon.
+                            ✅ Final price: ₹{b.counterPrice || b.offeredPrice} · {vehicleInfo ? `${vehicleInfo.ownerName} will contact you at ${b.farmerPhone}` : "Transport owner will contact you soon"}
                           </div>
                         )}
                       </CardContent>
@@ -443,6 +779,7 @@ export default function FarmerDashboard() {
                   );
                 })}
               </TabsContent>
+
 
               {/* ── Storage Bookings ── */}
               <TabsContent value="storage" className="mt-4 space-y-4">
@@ -758,6 +1095,174 @@ export default function FarmerDashboard() {
       </Dialog>
 
       <VoiceAssistant />
+
+      {/* ── Targeted Vehicle Booking Dialog ── */}
+      <Dialog open={vehicleBookingMode === "targeted"} onOpenChange={(open) => !open && setVehicleBookingMode(null)}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <span>📝</span> Request Vehicle: {targetVehicle?.ownerName}
+            </DialogTitle>
+            {targetVehicle && (
+              <DialogDescription className="text-xs">
+                {targetVehicle.vehicleNo} · {targetVehicle.vehicleType} · {targetVehicle.capacityTon}T
+                {targetVehicle.isRefrigerated ? " · ❄️ Refrigerated" : ""}
+                · Rating {targetVehicle.rating}/5 · {targetVehicle.totalTrips} trips completed
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1 col-span-2 sm:col-span-1">
+                <Label className="text-xs">Product / Crop *</Label>
+                <Select value={vehicleForm.product} onValueChange={(v) => setVF("product", v)}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select crop" /></SelectTrigger>
+                  <SelectContent>{CROPS_LIST.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              {vehicleForm.product === "Other" && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Specify Crop *</Label>
+                  <Input className="h-9 text-sm" placeholder="e.g. Brinjal" value={vehicleForm.customProduct} onChange={e => setVF("customProduct", e.target.value)} />
+                </div>
+              )}
+              <div className="space-y-1">
+                <Label className="text-xs">Total Load Weight (kg) *</Label>
+                <Input className="h-9 text-sm" type="number" placeholder="e.g. 3500" value={vehicleForm.weightKg} onChange={e => setVF("weightKg", e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Pickup Location *</Label>
+                <Input className="h-9 text-sm" placeholder="e.g. Warangal" value={vehicleForm.pickupLocation} onChange={e => setVF("pickupLocation", e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Drop Location *</Label>
+                <Input className="h-9 text-sm" placeholder="e.g. Hyderabad" value={vehicleForm.dropLocation} onChange={e => setVF("dropLocation", e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Pickup Date *</Label>
+                <Input className="h-9 text-sm" type="date" value={vehicleForm.date} onChange={e => setVF("date", e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Pickup Time *</Label>
+                <Input className="h-9 text-sm" type="time" value={vehicleForm.time} onChange={e => setVF("time", e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Your Offered Price (₹) *</Label>
+                <Input className="h-9 text-sm" type="number" placeholder="e.g. 2800" value={vehicleForm.offeredPrice} onChange={e => setVF("offeredPrice", e.target.value)} />
+                <p className="text-[10px] text-muted-foreground">Owner can send a counter offer</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Your Phone Number *</Label>
+                <Input className="h-9 text-sm" type="tel" placeholder="e.g. 98765 43210" value={vehicleForm.phone} onChange={e => setVF("phone", e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Additional Notes</Label>
+              <Input className="h-9 text-sm" placeholder="e.g. Urgent, fragile produce..." value={vehicleForm.notes} onChange={e => setVF("notes", e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => setVehicleBookingMode(null)}>Cancel</Button>
+            <Button size="sm" className="bg-primary" onClick={handleSubmitTargetedVehicle}>
+              📤 Send Request to {targetVehicle?.ownerName}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Broadcast Booking Dialog ── */}
+      <Dialog open={vehicleBookingMode === "broadcast"} onOpenChange={(open) => !open && setVehicleBookingMode(null)}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <span>📡</span> Broadcast Request to Multiple Vehicles
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              {selectedVehicleIds.length > 0
+                ? `Your request will be sent to ${selectedVehicleIds.length} selected vehicle${selectedVehicleIds.length > 1 ? "s" : ""}. The first to accept confirms the trip.`
+                : `Your request will be broadcast to all ${AVAILABLE_VEHICLES.length} available vehicles.`}
+            </DialogDescription>
+          </DialogHeader>
+          {/* Vehicle list preview */}
+          <div className="flex flex-wrap gap-1 pb-3 border-b border-border">
+            {(selectedVehicleIds.length > 0 ? selectedVehicleIds : AVAILABLE_VEHICLES.map(v => v.id)).map(id => {
+              const veh = AVAILABLE_VEHICLES.find(x => x.id === id);
+              return veh ? (
+                <span key={id} className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground">🚛 {veh.ownerName}</span>
+              ) : null;
+            })}
+          </div>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1 col-span-2 sm:col-span-1">
+                <Label className="text-xs">Product / Crop *</Label>
+                <Select value={vehicleForm.product} onValueChange={(v) => setVF("product", v)}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select crop" /></SelectTrigger>
+                  <SelectContent>{CROPS_LIST.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              {vehicleForm.product === "Other" && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Specify Crop *</Label>
+                  <Input className="h-9 text-sm" placeholder="e.g. Brinjal" value={vehicleForm.customProduct} onChange={e => setVF("customProduct", e.target.value)} />
+                </div>
+              )}
+              <div className="space-y-1">
+                <Label className="text-xs">Total Load Weight (kg) *</Label>
+                <Input className="h-9 text-sm" type="number" placeholder="e.g. 3500" value={vehicleForm.weightKg} onChange={e => setVF("weightKg", e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Pickup Location *</Label>
+                <Input className="h-9 text-sm" placeholder="e.g. Warangal" value={vehicleForm.pickupLocation} onChange={e => setVF("pickupLocation", e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Drop Location *</Label>
+                <Input className="h-9 text-sm" placeholder="e.g. Hyderabad" value={vehicleForm.dropLocation} onChange={e => setVF("dropLocation", e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Pickup Date *</Label>
+                <Input className="h-9 text-sm" type="date" value={vehicleForm.date} onChange={e => setVF("date", e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Pickup Time *</Label>
+                <Input className="h-9 text-sm" type="time" value={vehicleForm.time} onChange={e => setVF("time", e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Your Offered Price (₹) *</Label>
+                <Input className="h-9 text-sm" type="number" placeholder="e.g. 2800" value={vehicleForm.offeredPrice} onChange={e => setVF("offeredPrice", e.target.value)} />
+                <p className="text-[10px] text-muted-foreground">Each owner can counter individually</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Your Phone Number *</Label>
+                <Input className="h-9 text-sm" type="tel" placeholder="e.g. 98765 43210" value={vehicleForm.phone} onChange={e => setVF("phone", e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Additional Notes</Label>
+              <Input className="h-9 text-sm" placeholder="e.g. Urgent, festival delivery..." value={vehicleForm.notes} onChange={e => setVF("notes", e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => setVehicleBookingMode(null)}>Cancel</Button>
+            <Button size="sm" className="bg-primary" onClick={handleSubmitBroadcast}>
+              📡 Broadcast to {selectedVehicleIds.length > 0 ? selectedVehicleIds.length : AVAILABLE_VEHICLES.length} Vehicles
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </AppLayout>
   );
 }
