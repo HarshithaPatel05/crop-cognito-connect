@@ -11,34 +11,7 @@ import { StarRating } from "@/components/shared/StarRating";
 import { StatCard } from "@/components/shared/StatCard";
 import { VoiceAssistant } from "@/components/shared/VoiceAssistant";
 import { useToast } from "@/hooks/use-toast";
-
-// ── Mock data ──────────────────────────────────────────────────────────────────
-const BOOKING_REQUESTS = [
-  {
-    id: "BK-4821", farmer: "Ramesh Kumar", phone: "98765 43210",
-    from: "Warangal", to: "Hyderabad", crop: "Tomato",
-    weight: "3.5T", date: "Oct 15", time: "06:00 AM",
-    offeredPrice: 2800, status: "pending", urgent: true,
-  },
-  {
-    id: "BK-4822", farmer: "Sunita Devi", phone: "91234 56789",
-    from: "Karimnagar", to: "Hyderabad", crop: "Onion",
-    weight: "2T", date: "Oct 18", time: "08:00 AM",
-    offeredPrice: 1900, status: "pending", urgent: false,
-  },
-  {
-    id: "BK-4823", farmer: "Suresh Yadav", phone: "99887 76655",
-    from: "Adilabad", to: "Nagpur", crop: "Soybean",
-    weight: "5T", date: "Oct 20", time: "05:30 AM",
-    offeredPrice: 3400, status: "negotiating", urgent: false,
-  },
-  {
-    id: "BK-4824", farmer: "Meena Bai", phone: "88776 65544",
-    from: "Nizamabad", to: "Chennai", crop: "Chilli",
-    weight: "800kg", date: "Oct 22", time: "07:00 AM",
-    offeredPrice: 1200, status: "pending", urgent: false,
-  },
-];
+import { useTransportBooking } from "@/context/TransportBookingContext";
 
 const ACTIVE_TRIPS = [
   {
@@ -66,67 +39,59 @@ const LOAD_SHARE = [
   { farmer: "Meena Bai", crop: "Turmeric", from: "Adilabad", to: "Hyderabad", weight: "800kg", date: "Oct 21", saving: "₹900", match: 78 },
 ];
 
-// ── Component ─────────────────────────────────────────────────────────────────
 export default function TransportDashboard() {
   const { toast } = useToast();
+  const { bookings, sendCounter, acceptBooking, rejectBooking } = useTransportBooking();
 
-  // My vehicle state
   const [myVehicle, setMyVehicle] = useState({
-    type: "Large Truck",
-    regNo: "TS 09 EA 4512",
-    capacity: "10",
-    available: "8",
-    location: "Warangal, Telangana",
-    routes: "Warangal, Karimnagar, Hyderabad, Chennai",
-    pricePerKm: "45",
-    pricePerTon: "320",
-    minLoad: "500",
-    maxLoad: "10000",
-    availableFrom: "05:00",
-    availableTo: "22:00",
-    driverName: "Vijay Kumar",
-    driverPhone: "99887 11223",
-    status: "available",
+    type: "Large Truck", regNo: "TS 09 EA 4512", capacity: "10", available: "8",
+    location: "Warangal, Telangana", routes: "Warangal, Karimnagar, Hyderabad, Chennai",
+    pricePerKm: "45", pricePerTon: "320", minLoad: "500", maxLoad: "10000",
+    availableFrom: "05:00", availableTo: "22:00",
+    driverName: "Vijay Kumar", driverPhone: "99887 11223", status: "available",
   });
 
-  // Booking negotiation state
   const [negotiations, setNegotiations] = useState<Record<string, { counter: string; note: string }>>({});
-  const [bookingStatuses, setBookingStatuses] = useState<Record<string, string>>({});
-
-  const handleAccept = (id: string) => {
-    setBookingStatuses(p => ({ ...p, [id]: "accepted" }));
-    toast({ title: "✅ Booking Accepted!", description: `Booking ${id} confirmed.` });
-  };
-
-  const handleReject = (id: string) => {
-    setBookingStatuses(p => ({ ...p, [id]: "rejected" }));
-    toast({ title: "❌ Booking Rejected", description: `Booking ${id} has been declined.`, variant: "destructive" });
-  };
 
   const handleCounterOffer = (id: string) => {
     const counter = negotiations[id]?.counter;
-    if (!counter) return;
-    setBookingStatuses(p => ({ ...p, [id]: "counter-sent" }));
+    if (!counter || isNaN(Number(counter))) {
+      toast({ title: "Enter a valid counter price", variant: "destructive" });
+      return;
+    }
+    sendCounter(id, Number(counter), negotiations[id]?.note || "");
     toast({ title: "💬 Counter Offer Sent", description: `Sent ₹${counter} as counter offer for ${id}.` });
   };
 
   const totalEarned = COMPLETED_TRIPS.reduce((s, t) => s + t.earned, 0);
 
+  // Bookings that are actionable (not yet accepted/rejected by transport or resolved by farmer)
+  const actionableBookings = bookings.filter(b =>
+    ["pending", "counter-sent", "negotiating"].includes(b.status)
+  );
+  const newCount = bookings.filter(b => b.status === "pending").length;
+
   return (
     <AppLayout title="Transport Owner Dashboard" subtitle="Manage your vehicle, bookings & earnings">
       <div className="space-y-6 animate-fade-in">
 
-        {/* ── KPIs ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard title="This Month Earned" value="₹18,400" icon="💵" trend="up" trendValue="+12% vs last month" highlight />
-          <StatCard title="Pending Requests" value={String(BOOKING_REQUESTS.filter(b => b.status === "pending").length)} icon="📋" />
+          <StatCard title="Pending Requests" value={String(newCount)} icon="📋" />
           <StatCard title="Active Trips" value={String(ACTIVE_TRIPS.length)} icon="🚚" trend="stable" trendValue="On route now" />
           <StatCard title="Avg Rating" value="4.8 ⭐" icon="🏆" trend="up" trendValue="Top rated driver" />
         </div>
 
         <Tabs defaultValue="requests">
           <TabsList className="flex-wrap h-auto gap-1">
-            <TabsTrigger value="requests">📋 Booking Requests</TabsTrigger>
+            <TabsTrigger value="requests" className="relative">
+              📋 Booking Requests
+              {newCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-[9px] font-bold rounded-full px-1 leading-4 min-w-[16px] text-center">
+                  {newCount}
+                </span>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="active">🚚 Active Trips</TabsTrigger>
             <TabsTrigger value="myvehicle">🔧 My Vehicle</TabsTrigger>
             <TabsTrigger value="loadshare">🤝 Load Sharing</TabsTrigger>
@@ -137,58 +102,78 @@ export default function TransportDashboard() {
           <TabsContent value="requests" className="mt-4 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-foreground">Incoming Booking Requests</h3>
-              <Badge className="bg-primary/10 text-primary border-primary/20">
-                {BOOKING_REQUESTS.filter(b => !bookingStatuses[b.id] && b.status === "pending").length} New
-              </Badge>
+              <Badge className="bg-primary/10 text-primary border-primary/20 border">{newCount} New</Badge>
             </div>
 
-            {BOOKING_REQUESTS.map((b) => {
-              const bStatus = bookingStatuses[b.id] || b.status;
+            {bookings.length === 0 && (
+              <Card className="border-dashed border-border">
+                <CardContent className="py-12 text-center text-muted-foreground text-sm">
+                  <div className="text-4xl mb-3">📋</div>
+                  <p>No booking requests yet. Farmers will appear here once they submit a transport request.</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {bookings.map((b) => {
               const neg = negotiations[b.id] || { counter: "", note: "" };
-              const isActioned = ["accepted", "rejected", "counter-sent"].includes(bStatus);
+              const isActioned = ["accepted", "rejected", "farmer-accepted", "farmer-rejected"].includes(b.status);
+              const isCounterSent = b.status === "counter-sent";
 
               return (
                 <Card key={b.id} className={`border-2 transition-all ${
-                  bStatus === "accepted" ? "border-primary/40 bg-primary/3"
-                  : bStatus === "rejected" ? "border-destructive/30 bg-destructive/3 opacity-60"
-                  : bStatus === "counter-sent" ? "border-accent/40 bg-accent/3"
-                  : b.urgent ? "border-accent/50 bg-accent/3"
+                  b.status === "accepted" || b.status === "farmer-accepted"
+                    ? "border-primary/40 bg-primary/3"
+                  : b.status === "rejected" || b.status === "farmer-rejected"
+                    ? "border-destructive/30 bg-destructive/3 opacity-60"
+                  : isCounterSent
+                    ? "border-accent/40 bg-accent/3"
+                  : b.status === "pending"
+                    ? "border-border"
                   : "border-border"
                 }`}>
-                  <CardContent className="p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      {/* Left: trip info */}
-                      <div className="flex-1 min-w-0 space-y-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono text-xs text-muted-foreground">{b.id}</span>
-                          {b.urgent && <Badge className="bg-accent text-xs text-foreground border-0">⚡ Urgent</Badge>}
-                          <Badge variant="outline" className={`text-xs ${
-                            bStatus === "accepted" ? "bg-primary/10 text-primary border-primary/30"
-                            : bStatus === "rejected" ? "bg-destructive/10 text-destructive border-destructive/30"
-                            : bStatus === "counter-sent" ? "bg-accent/20 text-foreground border-accent/40"
-                            : "bg-muted text-muted-foreground"
-                          }`}>
-                            {bStatus === "counter-sent" ? "Counter Sent" : bStatus}
-                          </Badge>
-                        </div>
-
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1 text-xs">
-                          <div><span className="text-muted-foreground">Farmer</span><br /><span className="font-medium">{b.farmer}</span></div>
-                          <div><span className="text-muted-foreground">Phone</span><br /><span className="font-medium">{b.phone}</span></div>
-                          <div><span className="text-muted-foreground">Route</span><br /><span className="font-medium">{b.from} → {b.to}</span></div>
-                          <div><span className="text-muted-foreground">Crop / Load</span><br /><span className="font-medium">{b.crop} · {b.weight}</span></div>
-                          <div><span className="text-muted-foreground">Date</span><br /><span className="font-medium">{b.date}</span></div>
-                          <div><span className="text-muted-foreground">Pickup Time</span><br /><span className="font-medium">{b.time}</span></div>
-                          <div><span className="text-muted-foreground">Farmer's Price</span><br /><span className="font-semibold text-primary">₹{b.offeredPrice}</span></div>
-                        </div>
-                      </div>
+                  <CardContent className="p-4 space-y-3">
+                    {/* Header */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-xs text-muted-foreground">{b.id}</span>
+                      <Badge variant="outline" className={`text-xs ${
+                        b.status === "accepted" ? "bg-primary/10 text-primary border-primary/30"
+                        : b.status === "rejected" ? "bg-destructive/10 text-destructive border-destructive/30"
+                        : isCounterSent ? "bg-accent/20 text-foreground border-accent/40"
+                        : b.status === "farmer-accepted" ? "bg-primary/10 text-primary border-primary/30"
+                        : b.status === "farmer-rejected" ? "bg-destructive/10 text-destructive border-destructive/30"
+                        : "bg-muted text-muted-foreground"
+                      }`}>
+                        {b.status === "counter-sent" ? "💬 Counter Sent — Awaiting Farmer"
+                        : b.status === "farmer-accepted" ? "🎉 Farmer Accepted — Trip Confirmed"
+                        : b.status === "farmer-rejected" ? "✗ Farmer Declined Counter"
+                        : b.status === "accepted" ? "✅ Accepted"
+                        : b.status === "rejected" ? "❌ Rejected"
+                        : "⏳ Pending"}
+                      </Badge>
                     </div>
 
+                    {/* Details grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1 text-xs">
+                      <div><span className="text-muted-foreground">Farmer</span><br /><span className="font-medium">{b.farmerName}</span></div>
+                      <div><span className="text-muted-foreground">Phone</span><br /><span className="font-medium">{b.farmerPhone}</span></div>
+                      <div><span className="text-muted-foreground">Route</span><br /><span className="font-medium">{b.pickupLocation} → {b.dropLocation}</span></div>
+                      <div><span className="text-muted-foreground">Product / Load</span><br /><span className="font-medium">{b.product} · {b.weightKg >= 1000 ? `${b.weightKg/1000}T` : `${b.weightKg}kg`}</span></div>
+                      <div><span className="text-muted-foreground">Date</span><br /><span className="font-medium">{b.date}</span></div>
+                      <div><span className="text-muted-foreground">Pickup Time</span><br /><span className="font-medium">{b.time}</span></div>
+                      <div><span className="text-muted-foreground">Farmer's Price</span><br /><span className="font-semibold text-primary">₹{b.offeredPrice}</span></div>
+                      {b.counterPrice && (
+                        <div><span className="text-muted-foreground">Your Counter</span><br /><span className="font-semibold text-accent-foreground">₹{b.counterPrice}</span></div>
+                      )}
+                    </div>
+
+                    {b.notes && (
+                      <p className="text-xs text-muted-foreground italic">📝 Farmer note: {b.notes}</p>
+                    )}
+
                     {/* Action row */}
-                    {!isActioned && (
-                      <div className="mt-4 pt-4 border-t border-border flex flex-wrap gap-2 items-end">
-                        {/* Counter price input */}
-                        <div className="flex items-center gap-2">
+                    {!isActioned && !isCounterSent && (
+                      <div className="mt-2 pt-3 border-t border-border flex flex-wrap gap-2 items-end">
+                        <div className="flex items-end gap-2">
                           <div className="space-y-1">
                             <Label className="text-xs text-muted-foreground">Your Counter Price (₹)</Label>
                             <Input
@@ -210,43 +195,36 @@ export default function TransportDashboard() {
                         </div>
 
                         <div className="flex gap-2 mt-auto">
-                          <Button
-                            size="sm"
-                            className="bg-primary text-xs h-8"
-                            onClick={() => handleAccept(b.id)}
-                          >
+                          <Button size="sm" className="bg-primary text-xs h-8"
+                            onClick={() => { acceptBooking(b.id); toast({ title: "✅ Booking Accepted!", description: `Booking ${b.id} confirmed at ₹${b.offeredPrice}` }); }}>
                             ✅ Accept ₹{b.offeredPrice}
                           </Button>
                           {neg.counter && (
-                            <Button
-                              size="sm"
-                              variant="outline"
+                            <Button size="sm" variant="outline"
                               className="text-xs h-8 border-accent/50 text-foreground"
-                              onClick={() => handleCounterOffer(b.id)}
-                            >
+                              onClick={() => handleCounterOffer(b.id)}>
                               💬 Counter ₹{neg.counter}
                             </Button>
                           )}
-                          <Button
-                            size="sm"
-                            variant="outline"
+                          <Button size="sm" variant="outline"
                             className="text-xs h-8 border-destructive/50 text-destructive"
-                            onClick={() => handleReject(b.id)}
-                          >
+                            onClick={() => { rejectBooking(b.id); toast({ title: "❌ Booking Rejected", variant: "destructive" }); }}>
                             ✗ Decline
                           </Button>
                         </div>
                       </div>
                     )}
 
-                    {bStatus === "accepted" && (
-                      <div className="mt-3 pt-3 border-t border-primary/20 text-xs text-primary font-medium">
-                        ✅ Accepted — Trip confirmed for {b.date} at {b.time}
+                    {isCounterSent && (
+                      <div className="text-xs text-muted-foreground pt-2 border-t border-border">
+                        💬 Counter offer <span className="font-semibold text-foreground">₹{b.counterPrice}</span> sent — waiting for farmer to accept/decline.
+                        {b.counterNote && <span className="ml-1 italic">(Note: {b.counterNote})</span>}
                       </div>
                     )}
-                    {bStatus === "counter-sent" && (
-                      <div className="mt-3 pt-3 border-t border-accent/20 text-xs text-foreground font-medium">
-                        💬 Counter offer ₹{neg.counter} sent — waiting for farmer response
+
+                    {b.status === "farmer-accepted" && (
+                      <div className="text-xs text-primary font-medium pt-2 border-t border-primary/20">
+                        🎉 Trip confirmed at ₹{b.counterPrice || b.offeredPrice} — {b.date} at {b.time}. Contact farmer: {b.farmerPhone}
                       </div>
                     )}
                   </CardContent>
@@ -264,7 +242,7 @@ export default function TransportDashboard() {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-xs text-muted-foreground">{t.id}</span>
-                        <Badge variant="outline" className={`text-xs ${t.status === "in-transit" ? "bg-agro-sky/10 text-agro-sky border-agro-sky/30" : "bg-muted text-muted-foreground"}`}>
+                        <Badge variant="outline" className={`text-xs ${t.status === "in-transit" ? "bg-primary/10 text-primary border-primary/30" : "bg-muted text-muted-foreground"}`}>
                           {t.status === "in-transit" ? "🚚 In Transit" : "📦 Pickup"}
                         </Badge>
                       </div>
@@ -275,13 +253,11 @@ export default function TransportDashboard() {
                       <div className="font-semibold text-primary text-sm">₹{t.agreedPrice}</div>
                     </div>
                   </div>
-
                   <div className="grid grid-cols-3 gap-4 text-xs mb-4">
                     <div><span className="text-muted-foreground">Farmer</span><br /><span className="font-medium">{t.farmer}</span></div>
                     <div><span className="text-muted-foreground">Cargo</span><br /><span className="font-medium">{t.crop} · {t.weight}</span></div>
                     <div><span className="text-muted-foreground">Driver</span><br /><span className="font-medium">{t.driver}</span></div>
                   </div>
-
                   <div>
                     <div className="flex justify-between text-xs text-muted-foreground mb-1">
                       <span>Trip Progress</span><span>{t.progress}%</span>
@@ -293,16 +269,13 @@ export default function TransportDashboard() {
                       <span>📦 Pickup</span><span>🛣️ In Transit</span><span>✅ Delivered</span>
                     </div>
                   </div>
-
                   <div className="mt-3 flex gap-2">
                     <Button size="sm" className="bg-primary text-xs h-7" onClick={() => toast({ title: "📍 Location updated" })}>
                       Update Location
                     </Button>
-                    {t.status !== "delivered" && (
-                      <Button size="sm" variant="outline" className="text-xs h-7 border-primary/30 text-primary" onClick={() => toast({ title: "✅ Marked as delivered!" })}>
-                        Mark Delivered
-                      </Button>
-                    )}
+                    <Button size="sm" variant="outline" className="text-xs h-7 border-primary/30 text-primary" onClick={() => toast({ title: "✅ Marked as delivered!" })}>
+                      Mark Delivered
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -312,8 +285,6 @@ export default function TransportDashboard() {
           {/* ── My Vehicle ── */}
           <TabsContent value="myvehicle" className="mt-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-              {/* Vehicle Card */}
               <Card className="border-primary/20 bg-primary/3">
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
@@ -333,70 +304,46 @@ export default function TransportDashboard() {
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div className="bg-muted/50 rounded-lg p-3">
-                      <div className="text-muted-foreground mb-0.5">Total Capacity</div>
-                      <div className="font-semibold text-base">{myVehicle.capacity} Ton</div>
-                    </div>
-                    <div className="bg-muted/50 rounded-lg p-3">
-                      <div className="text-muted-foreground mb-0.5">Available Load</div>
-                      <div className="font-semibold text-base text-primary">{myVehicle.available} Ton</div>
-                    </div>
-                    <div className="bg-muted/50 rounded-lg p-3">
-                      <div className="text-muted-foreground mb-0.5">Price / km</div>
-                      <div className="font-semibold text-base">₹{myVehicle.pricePerKm}</div>
-                    </div>
-                    <div className="bg-muted/50 rounded-lg p-3">
-                      <div className="text-muted-foreground mb-0.5">Price / Ton</div>
-                      <div className="font-semibold text-base">₹{myVehicle.pricePerTon}</div>
-                    </div>
+                    {[
+                      { label: "Total Capacity", val: `${myVehicle.capacity} Ton` },
+                      { label: "Available Load", val: `${myVehicle.available} Ton`, primary: true },
+                      { label: "Price / km", val: `₹${myVehicle.pricePerKm}` },
+                      { label: "Price / Ton", val: `₹${myVehicle.pricePerTon}` },
+                    ].map(s => (
+                      <div key={s.label} className="bg-muted/50 rounded-lg p-3">
+                        <div className="text-muted-foreground mb-0.5">{s.label}</div>
+                        <div className={`font-semibold text-base ${s.primary ? "text-primary" : ""}`}>{s.val}</div>
+                      </div>
+                    ))}
                   </div>
                   <div className="text-xs space-y-1">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Min Load</span>
-                      <span className="font-medium">{myVehicle.minLoad} kg</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Max Load</span>
-                      <span className="font-medium">{myVehicle.maxLoad} kg</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Working Hours</span>
-                      <span className="font-medium">{myVehicle.availableFrom} – {myVehicle.availableTo}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Routes</span>
-                      <span className="font-medium text-right max-w-[160px]">{myVehicle.routes}</span>
-                    </div>
+                    {[
+                      { l: "Min Load", v: `${myVehicle.minLoad} kg` },
+                      { l: "Max Load", v: `${myVehicle.maxLoad} kg` },
+                      { l: "Working Hours", v: `${myVehicle.availableFrom} – ${myVehicle.availableTo}` },
+                      { l: "Routes", v: myVehicle.routes },
+                    ].map(r => (
+                      <div key={r.l} className="flex justify-between">
+                        <span className="text-muted-foreground">{r.l}</span>
+                        <span className="font-medium text-right max-w-[180px]">{r.v}</span>
+                      </div>
+                    ))}
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex-1 text-xs border-primary/30 text-primary"
-                      onClick={() => {
-                        setMyVehicle(v => ({ ...v, status: v.status === "available" ? "on-trip" : "available" }));
-                        toast({ title: "Status updated!" });
-                      }}
-                    >
-                      Toggle Availability
-                    </Button>
-                  </div>
+                  <Button size="sm" variant="outline" className="w-full text-xs border-primary/30 text-primary"
+                    onClick={() => { setMyVehicle(v => ({ ...v, status: v.status === "available" ? "on-trip" : "available" })); toast({ title: "Status updated!" }); }}>
+                    Toggle Availability
+                  </Button>
                 </CardContent>
               </Card>
 
-              {/* Edit Vehicle Settings */}
               <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Update Vehicle & Pricing</CardTitle>
-                </CardHeader>
+                <CardHeader className="pb-3"><CardTitle className="text-sm">Update Vehicle & Pricing</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <Label className="text-xs">Vehicle Type</Label>
-                      <Select defaultValue="large" onValueChange={(v) => setMyVehicle(p => ({ ...p, type: v }))}>
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
+                      <Select defaultValue="Large Truck" onValueChange={(v) => setMyVehicle(p => ({ ...p, type: v }))}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="Mini Truck">Mini Truck (1–3T)</SelectItem>
                           <SelectItem value="Large Truck">Large Truck (5–10T)</SelectItem>
@@ -410,30 +357,20 @@ export default function TransportDashboard() {
                       <Label className="text-xs">Registration No.</Label>
                       <Input className="h-8 text-xs" value={myVehicle.regNo} onChange={e => setMyVehicle(p => ({ ...p, regNo: e.target.value }))} />
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Total Capacity (Ton)</Label>
-                      <Input className="h-8 text-xs" type="number" value={myVehicle.capacity} onChange={e => setMyVehicle(p => ({ ...p, capacity: e.target.value }))} />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Available Load (Ton)</Label>
-                      <Input className="h-8 text-xs" type="number" value={myVehicle.available} onChange={e => setMyVehicle(p => ({ ...p, available: e.target.value }))} />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">My Price / km (₹)</Label>
-                      <Input className="h-8 text-xs" type="number" value={myVehicle.pricePerKm} onChange={e => setMyVehicle(p => ({ ...p, pricePerKm: e.target.value }))} />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">My Price / Ton (₹)</Label>
-                      <Input className="h-8 text-xs" type="number" value={myVehicle.pricePerTon} onChange={e => setMyVehicle(p => ({ ...p, pricePerTon: e.target.value }))} />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Min Load (kg)</Label>
-                      <Input className="h-8 text-xs" type="number" value={myVehicle.minLoad} onChange={e => setMyVehicle(p => ({ ...p, minLoad: e.target.value }))} />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Max Load (kg)</Label>
-                      <Input className="h-8 text-xs" type="number" value={myVehicle.maxLoad} onChange={e => setMyVehicle(p => ({ ...p, maxLoad: e.target.value }))} />
-                    </div>
+                    {[
+                      { label: "Total Capacity (Ton)", key: "capacity" },
+                      { label: "Available Load (Ton)", key: "available" },
+                      { label: "My Price / km (₹)", key: "pricePerKm" },
+                      { label: "My Price / Ton (₹)", key: "pricePerTon" },
+                      { label: "Min Load (kg)", key: "minLoad" },
+                      { label: "Max Load (kg)", key: "maxLoad" },
+                    ].map(f => (
+                      <div key={f.key} className="space-y-1">
+                        <Label className="text-xs">{f.label}</Label>
+                        <Input className="h-8 text-xs" type="number" value={(myVehicle as any)[f.key]}
+                          onChange={e => setMyVehicle(p => ({ ...p, [f.key]: e.target.value }))} />
+                      </div>
+                    ))}
                     <div className="space-y-1">
                       <Label className="text-xs">Available From</Label>
                       <Input className="h-8 text-xs" type="time" value={myVehicle.availableFrom} onChange={e => setMyVehicle(p => ({ ...p, availableFrom: e.target.value }))} />
@@ -461,11 +398,8 @@ export default function TransportDashboard() {
                       <Input className="h-8 text-xs" value={myVehicle.driverPhone} onChange={e => setMyVehicle(p => ({ ...p, driverPhone: e.target.value }))} />
                     </div>
                   </div>
-                  <Button
-                    className="w-full bg-primary text-xs"
-                    size="sm"
-                    onClick={() => toast({ title: "✅ Vehicle details saved!", description: "Farmers can now see your updated rates." })}
-                  >
+                  <Button className="w-full bg-primary text-xs" size="sm"
+                    onClick={() => toast({ title: "✅ Vehicle details saved!", description: "Farmers can now see your updated rates." })}>
                     Save Vehicle Details
                   </Button>
                 </CardContent>
@@ -495,7 +429,8 @@ export default function TransportDashboard() {
                     </div>
                     <div className="text-xs text-muted-foreground">📍 {ls.from} → {ls.to} · 📅 {ls.date}</div>
                     <div className="flex gap-2">
-                      <Button size="sm" className="flex-1 bg-primary text-xs" onClick={() => toast({ title: "✅ Load accepted!", description: `Added ${ls.farmer}'s load to your trip.` })}>
+                      <Button size="sm" className="flex-1 bg-primary text-xs"
+                        onClick={() => toast({ title: "✅ Load accepted!", description: `Added ${ls.farmer}'s load to your trip.` })}>
                         Accept Load
                       </Button>
                       <Button size="sm" variant="outline" className="text-xs border-border" onClick={() => toast({ title: "Skipped" })}>
@@ -532,9 +467,7 @@ export default function TransportDashboard() {
             </div>
 
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Completed Trips</CardTitle>
-              </CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Completed Trips</CardTitle></CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
