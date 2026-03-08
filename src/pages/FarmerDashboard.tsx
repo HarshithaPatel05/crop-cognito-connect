@@ -573,13 +573,84 @@ export default function FarmerDashboard() {
                 </Card>
               </TabsContent>
 
+              {/* ══════════════════════════════════════════════════════════
+                  TAB: FIND TRANSPORT
+              ══════════════════════════════════════════════════════════ */}
+              <TabsContent value="findtransport" className="mt-4 space-y-4">
+
+                {/* Header + controls */}
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold">Available Transport Vehicles</h3>
+                    <p className="text-xs text-muted-foreground">Browse vehicles, check capacity &amp; ratings, then book or broadcast</p>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    {(["all", "refrigerated", "available"] as const).map(f => (
+                      <Button key={f} size="sm" variant={vehicleFilter === f ? "default" : "outline"}
+                        className={`text-xs h-7 capitalize ${vehicleFilter === f ? "bg-primary" : ""}`}
+                        onClick={() => setVehicleFilter(f)}>
+                        {f === "all" ? "All" : f === "refrigerated" ? "❄️ Refrigerated" : "✅ Has Space"}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Broadcast-all banner when vehicles are selected */}
+                {selectedVehicleIds.length > 0 && (
+                  <Card className="border-primary/30 bg-primary/5">
+                    <CardContent className="p-3 flex items-center justify-between gap-3 flex-wrap">
+                      <div className="text-sm font-medium text-foreground">
+                        📡 <span className="text-primary font-bold">{selectedVehicleIds.length}</span> vehicle{selectedVehicleIds.length > 1 ? "s" : ""} selected for broadcast
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" className="text-xs h-7 border-destructive/50 text-destructive"
+                          onClick={() => setSelectedVehicleIds([])}>Clear</Button>
+                        <Button size="sm" className="bg-primary text-xs h-7"
+                          onClick={() => handleOpenBroadcast()}>
+                          📡 Send Broadcast Request
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Broadcast to ALL button */}
+                <Card className="border-dashed border-primary/30">
+                  <CardContent className="p-4 flex items-center justify-between flex-wrap gap-3">
+                    <div>
+                      <div className="font-semibold text-sm text-foreground">📡 Broadcast to All Vehicles</div>
+                      <div className="text-xs text-muted-foreground">Enter your details once — request sent to all {AVAILABLE_VEHICLES.length} available vehicles simultaneously</div>
+                    </div>
+                    <Button size="sm" className="bg-primary text-xs h-8"
+                      onClick={() => { setSelectedVehicleIds(AVAILABLE_VEHICLES.map(v => v.id)); handleOpenBroadcast(); }}>
+                      🚀 Broadcast to All ({AVAILABLE_VEHICLES.length})
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Vehicle grid */}
+                <div className="grid grid-cols-1 gap-4">
+                  {filteredVehicles.map(v => (
+                    <VehicleCard
+                      key={v.id}
+                      v={v}
+                      onBook={handleOpenTargeted}
+                      onBroadcast={handleOpenBroadcast}
+                      selected={selectedVehicleIds.includes(v.id)}
+                      onToggleSelect={handleToggleVehicleSelect}
+                    />
+                  ))}
+                </div>
+              </TabsContent>
+
               {/* ── Transport Bookings ── */}
               <TabsContent value="transport" className="mt-4 space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold">My Transport Bookings</h3>
-                  <Button size="sm" className="bg-primary text-xs h-8" onClick={() => setShowTransportDialog(true)}>
-                    + New Booking
+                  <Button size="sm" className="bg-primary text-xs h-8" onClick={() => setActiveTab("findtransport")}>
+                    + Find &amp; Book Vehicle
                   </Button>
+
                 </div>
 
                 {myTransportBookings.length === 0 && (
