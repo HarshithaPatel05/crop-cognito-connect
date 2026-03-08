@@ -658,8 +658,8 @@ export default function FarmerDashboard() {
                     <CardContent className="py-12 text-center text-muted-foreground text-sm">
                       <div className="text-4xl mb-3">🚚</div>
                       <p>No transport bookings yet.</p>
-                      <Button size="sm" className="mt-4 bg-primary" onClick={() => setShowTransportDialog(true)}>
-                        Book Transport Now
+                      <Button size="sm" className="mt-4 bg-primary" onClick={() => setActiveTab("findtransport")}>
+                        Find a Vehicle
                       </Button>
                     </CardContent>
                   </Card>
@@ -668,22 +668,43 @@ export default function FarmerDashboard() {
                 {myTransportBookings.map((b) => {
                   const meta = STATUS_META[b.status] || STATUS_META["pending"];
                   const isCounter = b.status === "counter-sent";
+                  const isAccepted = b.status === "accepted";
+                  const isConfirmed = b.status === "farmer-accepted";
+                  const vehicleInfo = b.targetVehicleId
+                    ? AVAILABLE_VEHICLES.find(v => v.id === b.targetVehicleId)
+                    : null;
 
                   return (
                     <Card key={b.id} className={`border-2 transition-all ${
-                      isCounter ? "border-accent/50 bg-accent/5"
-                      : b.status === "farmer-accepted" ? "border-primary/40 bg-primary/5"
+                      isConfirmed ? "border-primary bg-primary/5 shadow-md"
+                      : isCounter ? "border-accent/50 bg-accent/5"
+                      : isAccepted ? "border-primary/40 bg-primary/5"
                       : b.status === "rejected" || b.status === "farmer-rejected" ? "border-destructive/30 opacity-70"
                       : "border-border"
                     }`}>
                       <CardContent className="p-4 space-y-3">
                         <div className="flex items-center justify-between flex-wrap gap-2">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-mono text-xs text-muted-foreground">{b.id}</span>
-                            <Badge variant="outline" className={`text-xs ${meta.color}`}>{meta.label}</Badge>
+                            <Badge variant="outline" className={`text-xs font-semibold ${meta.color}`}>{meta.label}</Badge>
+                            {vehicleInfo && (
+                              <Badge variant="outline" className="text-xs border-secondary/40 text-secondary">
+                                🚛 {vehicleInfo.ownerName}
+                              </Badge>
+                            )}
+                            {!b.targetVehicleId && (
+                              <Badge variant="outline" className="text-[10px] text-muted-foreground">📡 Broadcast</Badge>
+                            )}
                           </div>
                           <span className="text-xs text-muted-foreground">{b.date} · {b.time}</span>
                         </div>
+
+                        {isConfirmed && (
+                          <div className="bg-primary/10 border border-primary/30 rounded-lg px-3 py-2 text-xs text-primary font-semibold text-center">
+                            🎉 TRIP CONFIRMED — Both you and the transport owner have agreed!
+                          </div>
+                        )}
+
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs">
                           <div><span className="text-muted-foreground">Product</span><br /><span className="font-medium">{b.product}</span></div>
                           <div><span className="text-muted-foreground">Load</span><br /><span className="font-medium">{b.weightKg >= 1000 ? `${b.weightKg / 1000}T` : `${b.weightKg}kg`}</span></div>
@@ -693,7 +714,26 @@ export default function FarmerDashboard() {
                           {b.counterPrice && (
                             <div><span className="text-muted-foreground">Counter Price</span><br /><span className="font-semibold">₹{b.counterPrice}</span></div>
                           )}
+                          {vehicleInfo && (
+                            <div><span className="text-muted-foreground">Vehicle</span><br /><span className="font-medium">{vehicleInfo.vehicleNo}</span></div>
+                          )}
+                          {vehicleInfo && (
+                            <div><span className="text-muted-foreground">Capacity</span><br /><span className="font-medium">{vehicleInfo.capacityTon}T</span></div>
+                          )}
                         </div>
+
+                        {vehicleInfo && !isConfirmed && b.status !== "rejected" && b.status !== "farmer-rejected" && (
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2">
+                            <StarRating rating={vehicleInfo.rating} size="sm" showValue />
+                            <span>·</span>
+                            <span>{vehicleInfo.totalTrips} trips</span>
+                            <span>·</span>
+                            <span>{vehicleInfo.onTimeRate}% on-time</span>
+                            <span>·</span>
+                            <span>📞 {vehicleInfo.phone}</span>
+                          </div>
+                        )}
+
                         {isCounter && b.counterNote && (
                           <div className="bg-accent/10 rounded-lg px-3 py-2 text-xs text-foreground border border-accent/30">
                             💬 Transport owner's note: <span className="font-medium">{b.counterNote}</span>
@@ -702,10 +742,10 @@ export default function FarmerDashboard() {
                         {isCounter && (
                           <div className="pt-2 border-t border-border flex gap-2 flex-wrap items-center">
                             <p className="text-xs text-muted-foreground flex-1">
-                              Transport owner wants <span className="font-semibold text-foreground">₹{b.counterPrice}</span> (you offered ₹{b.offeredPrice})
+                              Owner wants <span className="font-semibold text-foreground">₹{b.counterPrice}</span> (you offered ₹{b.offeredPrice})
                             </p>
                             <Button size="sm" className="bg-primary text-xs h-8"
-                              onClick={() => { farmerAccept(b.id); toast({ title: "✅ Counter accepted!", description: `Trip confirmed for ₹${b.counterPrice}` }); }}>
+                              onClick={() => { farmerAccept(b.id); toast({ title: "✅ Counter accepted! Trip Confirmed 🎉", description: `Confirmed at ₹${b.counterPrice}` }); }}>
                               ✅ Accept ₹{b.counterPrice}
                             </Button>
                             <Button size="sm" variant="outline" className="text-xs h-8 border-destructive/50 text-destructive"
@@ -714,9 +754,24 @@ export default function FarmerDashboard() {
                             </Button>
                           </div>
                         )}
-                        {b.status === "farmer-accepted" && (
+                        {isAccepted && !isConfirmed && (
+                          <div className="pt-2 border-t border-border flex gap-2 flex-wrap items-center">
+                            <p className="text-xs text-muted-foreground flex-1">
+                              Owner accepted at your price <span className="font-semibold text-foreground">₹{b.offeredPrice}</span> — confirm to finalise?
+                            </p>
+                            <Button size="sm" className="bg-primary text-xs h-8"
+                              onClick={() => { farmerAccept(b.id); toast({ title: "🎉 Trip Confirmed!", description: "Both parties agreed — trip is confirmed!" }); }}>
+                              ✅ Confirm Trip
+                            </Button>
+                            <Button size="sm" variant="outline" className="text-xs h-8 border-destructive/50 text-destructive"
+                              onClick={() => { farmerReject(b.id); toast({ title: "Trip cancelled", variant: "destructive" }); }}>
+                              Cancel
+                            </Button>
+                          </div>
+                        )}
+                        {isConfirmed && (
                           <div className="text-xs text-primary font-medium pt-1 border-t border-primary/20">
-                            🎉 Trip confirmed at ₹{b.counterPrice || b.offeredPrice} — transport owner will contact you soon.
+                            ✅ Final price: ₹{b.counterPrice || b.offeredPrice} · {vehicleInfo ? `${vehicleInfo.ownerName} will contact you at ${b.farmerPhone}` : "Transport owner will contact you soon"}
                           </div>
                         )}
                       </CardContent>
@@ -724,6 +779,7 @@ export default function FarmerDashboard() {
                   );
                 })}
               </TabsContent>
+
 
               {/* ── Storage Bookings ── */}
               <TabsContent value="storage" className="mt-4 space-y-4">
