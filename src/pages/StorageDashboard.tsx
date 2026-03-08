@@ -129,7 +129,7 @@ export default function StorageDashboard() {
   };
 
   return (
-    <AppLayout title="Storage Manager Dashboard" subtitle="Facilities · Bookings · Capacity · Schedule">
+    <AppLayout title="Storage Manager Dashboard" subtitle={`${facilityName} · ${storageType} · ${tempRange}${fssaiNo ? ` · FSSAI ${fssaiNo}` : ""}`}>
       <div className="space-y-6 animate-fade-in">
 
         {/* ── KPI Row ── */}
