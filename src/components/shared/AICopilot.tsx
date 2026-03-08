@@ -17,14 +17,36 @@ const QUICK_PROMPTS: Record<Language, string[]> = {
   hi: ["टमाटर कब बेचें?", "भाड़ा दर क्या है?", "अभी बेचें या रखें?"],
 };
 
+// Browser Web Speech API fallback
+function speakWithBrowser(
+  text: string,
+  lang: string,
+  onStart: () => void,
+  onEnd: () => void,
+  onError: (msg: string) => void
+): SpeechSynthesisUtterance | null {
+  if (!window.speechSynthesis) { onError("Speech synthesis not supported"); return null; }
+  window.speechSynthesis.cancel();
+  const clean = text.replace(/[*_`#~>]/g, "").replace(/\n+/g, ". ").trim().slice(0, 3000);
+  const utt = new SpeechSynthesisUtterance(clean);
+  utt.lang = lang === "te" ? "te-IN" : lang === "hi" ? "hi-IN" : "en-IN";
+  utt.rate = 0.9;
+  utt.onstart = onStart;
+  utt.onend = onEnd;
+  utt.onerror = () => onError("Browser TTS error");
+  window.speechSynthesis.speak(utt);
+  return utt;
+}
+
 // Play audio from ElevenLabs TTS edge function — falls back to browser TTS on error
 async function playElevenLabsTTS(
   text: string,
+  lang: string,
   supabaseUrl: string,
   publishableKey: string,
   onStart: () => void,
   onEnd: () => void,
-  onError: (msg: string) => void
+  onBrowserFallback: (utt: SpeechSynthesisUtterance) => void
 ): Promise<HTMLAudioElement | null> {
   onStart();
   try {
@@ -47,11 +69,13 @@ async function playElevenLabsTTS(
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
     audio.onended = () => { URL.revokeObjectURL(url); onEnd(); };
-    audio.onerror = () => { URL.revokeObjectURL(url); onError("Audio playback failed"); };
+    audio.onerror = () => { URL.revokeObjectURL(url); onEnd(); };
     await audio.play();
     return audio;
-  } catch (e) {
-    onError(e instanceof Error ? e.message : "TTS failed");
+  } catch {
+    // Silently fall back to browser TTS
+    const utt = speakWithBrowser(text, lang, () => {}, onEnd, onEnd);
+    if (utt) onBrowserFallback(utt);
     return null;
   }
 }
