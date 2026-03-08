@@ -13,6 +13,7 @@ import { VoiceAssistant } from "@/components/shared/VoiceAssistant";
 import { STORAGE_UNITS } from "@/data/mockData";
 import { useToast } from "@/hooks/use-toast";
 import { useStorageBooking } from "@/context/StorageBookingContext";
+import { useRole, StorageProfile } from "@/context/RoleContext";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
