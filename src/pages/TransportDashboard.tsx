@@ -612,6 +612,7 @@ export default function TransportDashboard() {
             <TabsTrigger value="active">🚚 Active Trips</TabsTrigger>
             <TabsTrigger value="myvehicle">🔧 My Vehicle</TabsTrigger>
             <TabsTrigger value="earnings">💰 Earnings</TabsTrigger>
+            <TabsTrigger value="demand">📊 Route Demand</TabsTrigger>
           </TabsList>
 
           {/* ════════════════════════════════════════════════════════════════
