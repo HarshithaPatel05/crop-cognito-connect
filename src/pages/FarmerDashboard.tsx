@@ -81,8 +81,25 @@ const EMPTY_STORAGE: StorageForm = {
 
 export default function FarmerDashboard() {
   const { toast } = useToast();
+  const { user } = useRole();
   const { bookings, addBooking, farmerAccept, farmerReject } = useTransportBooking();
   const { bookings: storageBookings, addBooking: addStorageBooking } = useStorageBooking();
+
+  const fp = (user?.profile ?? {}) as FarmerProfile;
+
+  // Live profile data falling back to demo defaults
+  const farmerName     = user?.name         ?? "Ramesh Kumar";
+  const farmerLocation = user?.location     ?? "Warangal, Telangana";
+  const primaryCrop    = fp.primaryCrop     ?? "Tomato";
+  const secondaryCrop  = fp.secondaryCrop   ?? "";
+  const farmArea       = fp.farmArea        ? `${fp.farmArea} acres` : "3.5 acres";
+  const farmAreaNum    = parseFloat(fp.farmArea ?? "3.5");
+  const expectedYield  = (farmAreaNum * 2.5).toFixed(2) + " T";
+  const harvestSeason  = fp.harvestSeason   ?? "Kharif";
+  const farmingType    = fp.farmingType     ?? "Conventional";
+  const soilType       = fp.soilType        ?? "Black Cotton";
+  const irrigationType = fp.irrigationType  ?? "Drip";
+  const annualYield    = fp.annualYield     ? `${fp.annualYield} T/yr` : "8–10 T/yr";
 
   const [showTransportDialog, setShowTransportDialog] = useState(false);
   const [showStorageDialog, setShowStorageDialog] = useState(false);
