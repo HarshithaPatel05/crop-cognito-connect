@@ -1945,6 +1945,14 @@ export default function FarmerDashboard() {
         </DialogContent>
       </Dialog>
 
+      {/* Rating Prompt — auto-surfaces after confirmed trips/storage */}
+      {currentRatingPending && (
+        <RatingPromptDialog
+          pending={currentRatingPending}
+          onClose={() => setActiveRatingPrompt(null)}
+        />
+      )}
+
     </AppLayout>
   );
 }
