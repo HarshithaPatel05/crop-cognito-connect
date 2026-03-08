@@ -118,7 +118,7 @@ function VehicleCard({
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
             {v.isRefrigerated && (
-              <Badge className="text-[10px] bg-blue-500/10 text-blue-600 border border-blue-400/30">❄️ Refrigerated</Badge>
+              <Badge className="text-[10px] bg-primary/10 text-primary border border-primary/30">❄️ Refrigerated</Badge>
             )}
             <Badge variant="outline" className="text-[10px]">{v.vehicleType}</Badge>
           </div>
