@@ -12,6 +12,7 @@ import { StatCard } from "@/components/shared/StatCard";
 import { VoiceAssistant } from "@/components/shared/VoiceAssistant";
 import { useToast } from "@/hooks/use-toast";
 import { useTransportBooking } from "@/context/TransportBookingContext";
+import { useRole, TransportProfile } from "@/context/RoleContext";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -339,14 +340,27 @@ function RouteRoadmap({ stops, capacityKg }: { stops: RoadStop[]; capacityKg: nu
 // ══════════════════════════════════════════════════════════════════════════════
 export default function TransportDashboard() {
   const { toast } = useToast();
+  const { user } = useRole();
   const { bookings, sendCounter, acceptBooking, rejectBooking } = useTransportBooking();
 
+  const tp = (user?.profile ?? {}) as TransportProfile;
+  const ownerName   = user?.name ?? "Vijay Logistics";
+  const ownerLoc    = user?.location ?? "Warangal, Telangana";
+  const vType       = tp.vehicleType ?? "Large Truck (5–10T)";
+  const vNo         = tp.vehicleNo   ?? "TS 09 EA 4512";
+  const vCap        = parseFloat(tp.capacity ?? "10");
+  const isRefrig    = tp.isRefrigerated === "Yes";
+  const fuelType    = tp.fuelType ?? "Diesel";
+  const routes      = tp.operatingRoutes ?? "Warangal, Karimnagar, Hyderabad, Chennai";
+  const driverLic   = tp.driverLicenseNo ?? "";
+  const tripsPerMo  = tp.tripsPerMonth ?? "6–15";
+
   const [myVehicle, setMyVehicle] = useState({
-    type: "Large Truck", regNo: "TS 09 EA 4512", capacity: 10, available: 8,
-    location: "Warangal, Telangana", routes: "Warangal, Karimnagar, Hyderabad, Chennai",
-    pricePerKm: "45", pricePerTon: "320", minLoad: "500", maxLoad: "10000",
+    type: vType, regNo: vNo, capacity: vCap, available: Math.max(1, vCap - 2),
+    location: ownerLoc, routes,
+    pricePerKm: "45", pricePerTon: "320", minLoad: "500", maxLoad: String(vCap * 1000),
     availableFrom: "05:00", availableTo: "22:00",
-    driverName: "Vijay Kumar", driverPhone: "99887 11223", status: "available",
+    driverName: ownerName, driverPhone: user?.phone ?? "99887 11223", status: "available",
   });
 
   const [negotiations, setNegotiations] = useState<Record<string, { counter: string; note: string }>>({});
@@ -472,7 +486,7 @@ export default function TransportDashboard() {
   };
 
   return (
-    <AppLayout title="Transport Owner Dashboard" subtitle="Manage your vehicle, bookings & earnings">
+    <AppLayout title="Transport Owner Dashboard" subtitle={`${ownerName} · ${vNo} · ${vType}${isRefrig ? " · ❄️ Refrigerated" : ""}`}>
       <div className="space-y-6 animate-fade-in">
 
         {/* ── Top KPIs ── */}
@@ -482,6 +496,38 @@ export default function TransportDashboard() {
           <StatCard title="Confirmed Trips" value={String(approvedBookings.length + confirmedXL.length)} icon="✅" trend="stable" trendValue={`Across ${allDates.length} dates`} />
           <StatCard title="Free Capacity" value={`${(overallFreeKg / 1000).toFixed(1)}T`} icon="⚖️" trend={overallUsedPct > 80 ? "up" : "stable"} trendValue={`${overallUsedPct}% utilised`} />
         </div>
+
+        {/* ── Profile Summary Banner ── */}
+        {user?.profile && (
+          <Card className="border-secondary/20 bg-secondary/5">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-3xl">🚚</span>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-foreground">{ownerName}</div>
+                  <div className="text-xs text-muted-foreground">{ownerLoc}</div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-x-6 gap-y-1 text-xs flex-1">
+                  {[
+                    { l: "🚛 Vehicle Type", v: vType },
+                    { l: "🔑 Reg. No.", v: vNo },
+                    { l: "⚖️ Capacity", v: `${vCap} Ton` },
+                    { l: "❄️ Refrigerated", v: isRefrig ? "Yes" : "No" },
+                    { l: "⛽ Fuel", v: fuelType },
+                    { l: "🗺️ Routes", v: routes },
+                    { l: "📅 Trips/Month", v: tripsPerMo },
+                    { l: "🪪 License", v: driverLic || "—" },
+                  ].filter(r => r.v && r.v !== "—").map(r => (
+                    <div key={r.l}>
+                      <div className="text-muted-foreground">{r.l}</div>
+                      <div className="font-semibold text-foreground">{r.v}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Tabs defaultValue="schedule">
           <TabsList className="flex-wrap h-auto gap-1">

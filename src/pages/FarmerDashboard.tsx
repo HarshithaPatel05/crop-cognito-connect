@@ -19,6 +19,7 @@ import { AI_RECOMMENDATIONS, STORAGE_UNITS } from "@/data/mockData";
 import { useToast } from "@/hooks/use-toast";
 import { useTransportBooking } from "@/context/TransportBookingContext";
 import { useStorageBooking, StorageType } from "@/context/StorageBookingContext";
+import { useRole, FarmerProfile } from "@/context/RoleContext";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 const PRICE_HISTORY = [
@@ -80,8 +81,25 @@ const EMPTY_STORAGE: StorageForm = {
 
 export default function FarmerDashboard() {
   const { toast } = useToast();
+  const { user } = useRole();
   const { bookings, addBooking, farmerAccept, farmerReject } = useTransportBooking();
   const { bookings: storageBookings, addBooking: addStorageBooking } = useStorageBooking();
+
+  const fp = (user?.profile ?? {}) as FarmerProfile;
+
+  // Live profile data falling back to demo defaults
+  const farmerName     = user?.name         ?? "Ramesh Kumar";
+  const farmerLocation = user?.location     ?? "Warangal, Telangana";
+  const primaryCrop    = fp.primaryCrop     ?? "Tomato";
+  const secondaryCrop  = fp.secondaryCrop   ?? "";
+  const farmArea       = fp.farmArea        ? `${fp.farmArea} acres` : "3.5 acres";
+  const farmAreaNum    = parseFloat(fp.farmArea ?? "3.5");
+  const expectedYield  = (farmAreaNum * 2.5).toFixed(2) + " T";
+  const harvestSeason  = fp.harvestSeason   ?? "Kharif";
+  const farmingType    = fp.farmingType     ?? "Conventional";
+  const soilType       = fp.soilType        ?? "Black Cotton";
+  const irrigationType = fp.irrigationType  ?? "Drip";
+  const annualYield    = fp.annualYield     ? `${fp.annualYield} T/yr` : "8–10 T/yr";
 
   const [showTransportDialog, setShowTransportDialog] = useState(false);
   const [showStorageDialog, setShowStorageDialog] = useState(false);
@@ -90,13 +108,14 @@ export default function FarmerDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [smsCmd, setSmsCmd] = useState("");
 
-  const [farmData, setFarmData] = useState({
-    name: "Ramesh Kumar", village: "Warangal", crop: "Tomato", variety: "Hybrid F1",
-    area: "3.5", sowingDate: "2024-07-15", harvestDate: "2024-10-15",
+  const [farmData] = useState({
+    name: farmerName, village: farmerLocation.split(",")[0].trim(),
+    crop: primaryCrop, variety: "Hybrid F1",
+    area: fp.farmArea ?? "3.5", sowingDate: "2024-07-15", harvestDate: "2024-10-15",
   });
 
-  const myTransportBookings = bookings.filter(b => b.farmerName === "Ramesh Kumar");
-  const myStorageBookings = storageBookings.filter(b => b.farmerName === "Ramesh Kumar");
+  const myTransportBookings = bookings.filter(b => b.farmerName === farmerName);
+  const myStorageBookings = storageBookings.filter(b => b.farmerName === farmerName);
 
   const pendingCounter = myTransportBookings.filter(b => b.status === "counter-sent").length;
   const pendingStorage = myStorageBookings.filter(b => b.status === "pending").length;
@@ -185,17 +204,50 @@ export default function FarmerDashboard() {
   };
 
   return (
-    <AppLayout title="Farmer Dashboard" subtitle="Ramesh Kumar · Warangal · Tomato Farm">
+    <AppLayout title="Farmer Dashboard" subtitle={`${farmerName} · ${farmerLocation} · ${primaryCrop} Farm`}>
       <div className="space-y-6 animate-fade-in">
         {/* KPI row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard title="Expected Yield" value="8.75 T" subtext="3.5 acres × 2.5T/acre" icon="🌾" trend="up" trendValue="+12% vs last season" highlight />
-          <StatCard title="Market Price" value="₹28/kg" subtext="Predicted ₹35/kg in 2 weeks" icon="📈" trend="up" trendValue="+25% forecast" />
+          <StatCard title="Expected Yield" value={expectedYield} subtext={`${farmArea} × 2.5T/acre`} icon="🌾" trend="up" trendValue="+12% vs last season" highlight />
+          <StatCard title="Market Price" value="₹28/kg" subtext={`${primaryCrop} · Predicted ₹35/kg in 2 weeks`} icon="📈" trend="up" trendValue="+25% forecast" />
           <StatCard title="Demand Forecast" value="HIGH" subtext="Hyderabad, Bangalore markets" icon="🔥" trend="up" trendValue="Festival season demand" />
           <StatCard title="Days to Harvest" value="7 days" subtext="Oct 15, 2024" icon="📅" />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* ── Profile Summary Card ── */}
+          {user?.profile && (
+            <div className="lg:col-span-3">
+              <Card className="border-primary/20 bg-primary/3">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="text-3xl">👨‍🌾</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-foreground">{farmerName}</div>
+                      <div className="text-xs text-muted-foreground">{farmerLocation}</div>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-x-6 gap-y-1 text-xs flex-1">
+                      {[
+                        { l: "🌱 Primary Crop", v: primaryCrop },
+                        { l: "🌿 Secondary", v: secondaryCrop || "—" },
+                        { l: "📐 Farm Area", v: farmArea },
+                        { l: "🌾 Season", v: harvestSeason },
+                        { l: "🔬 Farming", v: farmingType },
+                        { l: "🏗️ Soil", v: soilType },
+                        { l: "💧 Irrigation", v: irrigationType },
+                        { l: "📦 Annual Yield", v: annualYield },
+                      ].filter(r => r.v && r.v !== "—").map(r => (
+                        <div key={r.l}>
+                          <div className="text-muted-foreground">{r.l}</div>
+                          <div className="font-semibold text-foreground">{r.v}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
           {/* Left column */}
           <div className="lg:col-span-2 space-y-5">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -481,7 +533,7 @@ export default function FarmerDashboard() {
                     ].map((f) => (
                       <div key={f.key} className="space-y-1">
                         <Label className="text-xs">{f.label}</Label>
-                        <Input value={(farmData as any)[f.key]} onChange={(e) => setFarmData(prev => ({ ...prev, [f.key]: e.target.value }))} className="text-sm" />
+                        <Input value={(farmData as any)[f.key]} onChange={(_e) => toast({ title: "Update your profile to change farm details" })} className="text-sm" />
                       </div>
                     ))}
                     <div className="sm:col-span-2">

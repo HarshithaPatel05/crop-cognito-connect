@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState } from "react";
 
 export type AppRole =
   | "farmer"
@@ -11,11 +11,60 @@ export type AppRole =
   | "admin"
   | null;
 
+// ── Per-role profile data collected during registration ──────────────────────
+export interface FarmerProfile {
+  farmArea?: string; soilType?: string; irrigationType?: string;
+  primaryCrop?: string; secondaryCrop?: string; harvestSeason?: string;
+  annualYield?: string; farmingType?: string; landOwnership?: string;
+  hasKCC?: string; bankName?: string; preferredMarket?: string;
+}
+export interface BuyerProfile {
+  buyerType?: string; orgName?: string; gstNo?: string;
+  monthlyVolume?: string; preferredCrops?: string;
+  deliveryArea?: string; paymentMode?: string;
+}
+export interface TransportProfile {
+  vehicleType?: string; vehicleNo?: string; capacity?: string;
+  isRefrigerated?: string; driverLicenseNo?: string;
+  operatingRoutes?: string; tripsPerMonth?: string; fuelType?: string;
+}
+export interface StorageProfile {
+  warehouseName?: string; storageCapacity?: string; storageTypes?: string;
+  tempRange?: string; fssaiNo?: string; unitsAvailable?: string;
+  pricePerTonDay?: string; insuranceCovered?: string;
+}
+export interface FinanceProfile {
+  orgName?: string; bankBranch?: string; ifscCode?: string;
+  designation?: string; employeeId?: string;
+  loanTypes?: string; maxLoanAmount?: string; interestRate?: string;
+}
+export interface FPOProfile {
+  orgName?: string; orgType?: string; regNo?: string;
+  designation?: string; memberCount?: string;
+  clusterDistrict?: string; govtSchemes?: string; certAuthority?: string;
+}
+export interface AnalyticsProfile {
+  analyticsOrg?: string; designation?: string;
+  researchFocus?: string; toolsUsed?: string; reportFrequency?: string;
+}
+export interface AdminProfile {
+  adminOrg?: string; designation?: string; accessLevel?: string;
+}
+
+export type RoleProfile =
+  | FarmerProfile | BuyerProfile | TransportProfile | StorageProfile
+  | FinanceProfile | FPOProfile | AnalyticsProfile | AdminProfile;
+
 export interface RoleUser {
   role: AppRole;
   name: string;
   location: string;
   email: string;
+  phone?: string;
+  district?: string;
+  state?: string;
+  pincode?: string;
+  profile?: RoleProfile;
 }
 
 interface RoleContextType {

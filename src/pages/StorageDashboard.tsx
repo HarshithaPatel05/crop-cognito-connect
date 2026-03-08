@@ -13,6 +13,7 @@ import { VoiceAssistant } from "@/components/shared/VoiceAssistant";
 import { STORAGE_UNITS } from "@/data/mockData";
 import { useToast } from "@/hooks/use-toast";
 import { useStorageBooking } from "@/context/StorageBookingContext";
+import { useRole, StorageProfile } from "@/context/RoleContext";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -48,7 +49,19 @@ const STATIC_INVENTORY = [
 
 export default function StorageDashboard() {
   const { toast } = useToast();
+  const { user } = useRole();
   const { bookings, approveBooking, rejectBooking, completeBooking } = useStorageBooking();
+
+  const sp = (user?.profile ?? {}) as StorageProfile;
+  const managerName   = user?.name ?? "CoolStore Facilities";
+  const facilityName  = sp.warehouseName ?? "My Storage Facility";
+  const storageCapTon = parseFloat(sp.storageCapacity ?? "200");
+  const storageType   = sp.storageTypes ?? "Cold Storage";
+  const tempRange     = sp.tempRange ?? "4–10°C";
+  const fssaiNo       = sp.fssaiNo ?? "";
+  const unitsCount    = sp.unitsAvailable ?? "4";
+  const ratePerTonDay = sp.pricePerTonDay ?? "25";
+  const insured       = sp.insuranceCovered ?? "No";
 
   const [managerNotes, setManagerNotes] = useState<Record<string, string>>({});
 
@@ -116,7 +129,7 @@ export default function StorageDashboard() {
   };
 
   return (
-    <AppLayout title="Storage Manager Dashboard" subtitle="Facilities · Bookings · Capacity · Schedule">
+    <AppLayout title="Storage Manager Dashboard" subtitle={`${facilityName} · ${storageType} · ${tempRange}${fssaiNo ? ` · FSSAI ${fssaiNo}` : ""}`}>
       <div className="space-y-6 animate-fade-in">
 
         {/* ── KPI Row ── */}
@@ -126,6 +139,37 @@ export default function StorageDashboard() {
           <StatCard title="Scheduled Revenue" value={`₹${(totalScheduledRevenue / 1000).toFixed(1)}K`} icon="💰" trend="up" trendValue="From confirmed bookings" highlight />
           <StatCard title="Total Scheduled" value={`${(totalScheduledKg / 1000).toFixed(1)}T`} icon="⚖️" trend="stable" trendValue="Across all units" />
         </div>
+
+        {/* ── Profile Summary Banner ── */}
+        {user?.profile && (
+          <Card className="border-accent/20 bg-accent/5">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-3xl">🏪</span>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-foreground">{facilityName}</div>
+                  <div className="text-xs text-muted-foreground">{user?.location}</div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-x-6 gap-y-1 text-xs flex-1">
+                  {[
+                    { l: "🏗️ Type", v: storageType },
+                    { l: "⚖️ Capacity", v: `${storageCapTon}T` },
+                    { l: "🌡️ Temp Range", v: tempRange },
+                    { l: "🔢 Units/Cells", v: unitsCount },
+                    { l: "₹ Rate/Ton/Day", v: ratePerTonDay ? `₹${ratePerTonDay}` : "—" },
+                    { l: "🛡️ Insured", v: insured },
+                    { l: "📜 FSSAI", v: fssaiNo || "—" },
+                  ].filter(r => r.v && r.v !== "—").map(r => (
+                    <div key={r.l}>
+                      <div className="text-muted-foreground">{r.l}</div>
+                      <div className="font-semibold text-foreground">{r.v}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Tabs defaultValue="schedule">
           <TabsList className="flex-wrap h-auto gap-1">
