@@ -1706,7 +1706,7 @@ export default function FarmerDashboard() {
         </DialogContent>
       </Dialog>
 
-      <VoiceAssistant />
+      <AICopilot />
 
       {/* ── Targeted Vehicle Booking Dialog ── */}
       <Dialog open={vehicleBookingMode === "targeted"} onOpenChange={(open) => !open && setVehicleBookingMode(null)}>
