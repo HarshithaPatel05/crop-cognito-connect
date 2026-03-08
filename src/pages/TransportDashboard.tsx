@@ -340,14 +340,27 @@ function RouteRoadmap({ stops, capacityKg }: { stops: RoadStop[]; capacityKg: nu
 // ══════════════════════════════════════════════════════════════════════════════
 export default function TransportDashboard() {
   const { toast } = useToast();
+  const { user } = useRole();
   const { bookings, sendCounter, acceptBooking, rejectBooking } = useTransportBooking();
 
+  const tp = (user?.profile ?? {}) as TransportProfile;
+  const ownerName   = user?.name ?? "Vijay Logistics";
+  const ownerLoc    = user?.location ?? "Warangal, Telangana";
+  const vType       = tp.vehicleType ?? "Large Truck (5–10T)";
+  const vNo         = tp.vehicleNo   ?? "TS 09 EA 4512";
+  const vCap        = parseFloat(tp.capacity ?? "10");
+  const isRefrig    = tp.isRefrigerated === "Yes";
+  const fuelType    = tp.fuelType ?? "Diesel";
+  const routes      = tp.operatingRoutes ?? "Warangal, Karimnagar, Hyderabad, Chennai";
+  const driverLic   = tp.driverLicenseNo ?? "";
+  const tripsPerMo  = tp.tripsPerMonth ?? "6–15";
+
   const [myVehicle, setMyVehicle] = useState({
-    type: "Large Truck", regNo: "TS 09 EA 4512", capacity: 10, available: 8,
-    location: "Warangal, Telangana", routes: "Warangal, Karimnagar, Hyderabad, Chennai",
-    pricePerKm: "45", pricePerTon: "320", minLoad: "500", maxLoad: "10000",
+    type: vType, regNo: vNo, capacity: vCap, available: Math.max(1, vCap - 2),
+    location: ownerLoc, routes,
+    pricePerKm: "45", pricePerTon: "320", minLoad: "500", maxLoad: String(vCap * 1000),
     availableFrom: "05:00", availableTo: "22:00",
-    driverName: "Vijay Kumar", driverPhone: "99887 11223", status: "available",
+    driverName: ownerName, driverPhone: user?.phone ?? "99887 11223", status: "available",
   });
 
   const [negotiations, setNegotiations] = useState<Record<string, { counter: string; note: string }>>({});
