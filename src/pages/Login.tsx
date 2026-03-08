@@ -190,7 +190,7 @@ export default function Login() {
 
                 <div className="text-center text-xs text-muted-foreground pt-1">
                   Don't have an account?{" "}
-                  <button type="button" className="text-primary underline underline-offset-2 hover:text-primary/80" onClick={() => navigate("/")}>
+                  <button type="button" className="text-primary underline underline-offset-2 hover:text-primary/80" onClick={() => navigate("/register")}>
                     Register here
                   </button>
                 </div>
