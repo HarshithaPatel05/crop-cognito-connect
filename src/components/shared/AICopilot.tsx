@@ -183,7 +183,7 @@ export function AICopilot() {
       return;
     }
 
-    const rec = new SpeechRecognition();
+    const rec = new SR();
     rec.lang = lang === "te" ? "te-IN" : lang === "hi" ? "hi-IN" : "en-IN";
     rec.interimResults = false;
     rec.onresult = (e) => {
