@@ -238,7 +238,7 @@ export function AICopilot() {
         <div className="fixed bottom-24 right-6 z-50 w-96 max-w-[calc(100vw-2rem)] bg-card rounded-2xl shadow-2xl border border-primary/20 flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
           {/* Header */}
           <div className="bg-gradient-to-r from-primary to-primary/80 px-4 py-3 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-primary-foreground/20 flex items-center justify-center text-lg flex-shrink-0">🤖</div>
+        <div className="w-9 h-9 rounded-full bg-primary-foreground/20 flex items-center justify-center text-lg flex-shrink-0">🤖</div>
             <div className="flex-1 min-w-0">
               <div className="text-primary-foreground font-semibold text-sm leading-tight">AgroSense Copilot</div>
               <div className="text-primary-foreground/70 text-[10px]">AI · Sell Time · Transport · Storage</div>
