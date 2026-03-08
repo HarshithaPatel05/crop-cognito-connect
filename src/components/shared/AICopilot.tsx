@@ -203,27 +203,41 @@ export function AICopilot() {
     });
   };
 
-  const speak = (text: string, idx: number) => {
-    if (!window.speechSynthesis) {
-      toast({ title: "Not supported", description: "Text-to-speech not supported on this browser." });
-      return;
-    }
-    // If already speaking this message, stop it
+  const speak = async (text: string, idx: number) => {
+    // Stop if already speaking this message
     if (speakingIdx === idx) {
-      window.speechSynthesis.cancel();
+      audioRef.current?.pause();
+      audioRef.current = null;
       setSpeakingIdx(null);
+      setTtsLoading(false);
       return;
     }
-    window.speechSynthesis.cancel();
-    // Strip markdown-like symbols for cleaner speech
-    const clean = text.replace(/[*_`#~>]/g, "").replace(/\n+/g, " ");
-    const utterance = new SpeechSynthesisUtterance(clean);
-    utterance.lang = lang === "te" ? "te-IN" : lang === "hi" ? "hi-IN" : "en-IN";
-    utterance.rate = 0.92;
-    utterance.onstart = () => setSpeakingIdx(idx);
-    utterance.onend = () => setSpeakingIdx(null);
-    utterance.onerror = () => setSpeakingIdx(null);
-    window.speechSynthesis.speak(utterance);
+    // Stop any currently playing audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+      setSpeakingIdx(null);
+    }
+
+    const audio = await playElevenLabsTTS(
+      text,
+      supabaseUrl,
+      publishableKey,
+      () => { setTtsLoading(true); },
+      () => { setSpeakingIdx(idx); setTtsLoading(false); audioRef.current = null; setSpeakingIdx(null); },
+      (err) => {
+        setTtsLoading(false);
+        setSpeakingIdx(null);
+        toast({ variant: "destructive", title: "Read aloud failed", description: err });
+      },
+    );
+
+    if (audio) {
+      audioRef.current = audio;
+      // onStart fires before play, but we need to update speakingIdx after audio is returned
+      setSpeakingIdx(idx);
+      setTtsLoading(false);
+    }
   };
 
   const toggleVoice = () => {
