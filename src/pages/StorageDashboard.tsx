@@ -417,6 +417,7 @@ export default function StorageDashboard() {
                     </div>
 
                     <div className="font-semibold text-sm">{b.unitName} · <span className="text-muted-foreground font-normal text-xs">📍 {b.unitLocation}</span></div>
+                    <RatingBadge targetId={String(b.unitId)} showReviews={false} />
 
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1 text-xs">
                       <div><span className="text-muted-foreground">Farmer</span><br /><span className="font-medium">{b.farmerName}</span></div>
