@@ -280,14 +280,28 @@ export function AICopilot() {
                 {msg.role === "assistant" && (
                   <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center mr-1.5 flex-shrink-0 mt-0.5 text-sm">🤖</div>
                 )}
-                <div
-                  className={`max-w-[82%] rounded-2xl px-3 py-2 text-xs leading-relaxed ${
-                    msg.role === "user"
-                      ? "bg-primary text-primary-foreground rounded-tr-sm"
-                      : "bg-muted text-foreground rounded-tl-sm"
-                  }`}
-                >
+                <div className={`max-w-[82%] rounded-2xl px-3 py-2 text-xs leading-relaxed ${
+                  msg.role === "user"
+                    ? "bg-primary text-primary-foreground rounded-tr-sm"
+                    : "bg-muted text-foreground rounded-tl-sm"
+                }`}>
                   {msg.content}
+                  {msg.role === "assistant" && (
+                    <button
+                      onClick={() => speak(msg.content, i)}
+                      title={speakingIdx === i ? "Stop reading" : "Read aloud"}
+                      className={`mt-1.5 flex items-center gap-1 text-[10px] transition-colors ${
+                        speakingIdx === i
+                          ? "text-primary font-medium"
+                          : "text-muted-foreground hover:text-primary"
+                      }`}
+                    >
+                      {speakingIdx === i
+                        ? <><VolumeX className="w-3 h-3" /> Stop</>
+                        : <><Volume2 className="w-3 h-3" /> Read aloud</>
+                      }
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
