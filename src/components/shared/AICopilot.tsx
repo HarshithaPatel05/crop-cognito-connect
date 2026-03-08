@@ -309,6 +309,18 @@ export function AICopilot() {
               <div className="text-primary-foreground font-semibold text-sm leading-tight">AgroSense Copilot</div>
               <div className="text-primary-foreground/70 text-[10px]">AI · Sell Time · Transport · Storage</div>
             </div>
+            {/* Auto-read toggle */}
+            <button
+              onClick={() => setAutoRead((v) => !v)}
+              title={autoRead ? "Auto-read ON — click to disable" : "Auto-read OFF — click to enable"}
+              className={`w-7 h-7 rounded-full flex items-center justify-center transition-all mr-1 ${
+                autoRead
+                  ? "bg-primary-foreground text-primary"
+                  : "bg-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/40"
+              }`}
+            >
+              {autoRead ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+            </button>
             {/* Language switcher */}
             <div className="flex gap-1 mr-1">
               {(["en", "te", "hi"] as Language[]).map((l) => (
